@@ -1,0 +1,525 @@
+{
+  "icon": "clock",
+  "main": "runtime/index.js",
+  "drivers": [
+    "notifications"
+  ],
+  "uiSlots": {
+    "right_sidebar": "clock.panel",
+    "footer": "clock.footer"
+  },
+  "slotDefaults": {
+    "right_sidebar": {
+      "order": 40
+    },
+    "footer": {
+      "side": "right",
+      "order": 70
+    }
+  },
+  "notifications": [
+    {
+      "id": "alarm",
+      "label": "Alarm",
+      "labelKey": "plugin.clock.notification.alarm",
+      "description": "Rings until you stop or snooze it, and fires even with every window closed.",
+      "descriptionKey": "plugin.clock.notification.alarmDesc",
+      "defaultChannel": "both",
+      "ringable": true
+    },
+    {
+      "id": "timer",
+      "label": "Timer finished",
+      "labelKey": "plugin.clock.notification.timer",
+      "description": "Rings until you stop it.",
+      "descriptionKey": "plugin.clock.notification.timerDesc",
+      "defaultChannel": "both",
+      "ringable": true
+    },
+    {
+      "id": "pomodoro",
+      "label": "Pomodoro phase changed",
+      "labelKey": "plugin.clock.notification.pomodoro",
+      "description": "Announces the switch between focus and break. Does not ring.",
+      "descriptionKey": "plugin.clock.notification.pomodoroDesc",
+      "defaultChannel": "system"
+    }
+  ],
+  "settingsView": "clock.settings",
+  "settingsSections": [
+    {
+      "id": "world",
+      "label": "World clock",
+      "labelKey": "plugin.clock.section.world",
+      "icon": "world",
+      "visibleWhenSetting": "showWorld"
+    },
+    {
+      "id": "alarm",
+      "label": "Alarm",
+      "labelKey": "plugin.clock.section.alarm",
+      "icon": "alarm",
+      "visibleWhenSetting": "showAlarm"
+    },
+    {
+      "id": "stopwatch",
+      "label": "Stopwatch",
+      "labelKey": "plugin.clock.section.stopwatch",
+      "icon": "stopwatch",
+      "visibleWhenSetting": "showStopwatch"
+    },
+    {
+      "id": "timer",
+      "label": "Timer",
+      "labelKey": "plugin.clock.section.timer",
+      "icon": "timer",
+      "visibleWhenSetting": "showTimer"
+    },
+    {
+      "id": "pomodoro",
+      "label": "Pomodoro",
+      "labelKey": "plugin.clock.section.pomodoro",
+      "icon": "pomodoro",
+      "visibleWhenSetting": "showPomodoro"
+    }
+  ],
+  "settingsSchema": {
+    "fields": [
+      {
+        "key": "showWorld",
+        "label": "Show World clock",
+        "labelKey": "plugin.clock.field.showWorld",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the world clock list in the Clock tab and its own settings section.",
+        "descriptionKey": "auto.2a8a7da69f8f"
+      },
+      {
+        "key": "showAlarm",
+        "label": "Show Alarm",
+        "labelKey": "plugin.clock.field.showAlarm",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Alarm tab and its own settings section.",
+        "descriptionKey": "auto.a0fd69ac917c"
+      },
+      {
+        "key": "showStopwatch",
+        "label": "Show Stopwatch",
+        "labelKey": "plugin.clock.field.showStopwatch",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Stopwatch tab and its own settings section.",
+        "descriptionKey": "auto.d8127bcecbf4"
+      },
+      {
+        "key": "showTimer",
+        "label": "Show Timer",
+        "labelKey": "plugin.clock.field.showTimer",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Timer tab and its own settings section.",
+        "descriptionKey": "auto.e2b64297512f"
+      },
+      {
+        "key": "showPomodoro",
+        "label": "Show Pomodoro",
+        "labelKey": "plugin.clock.field.showPomodoro",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Pomodoro tab and its own settings section.",
+        "descriptionKey": "auto.5b9be3e4f35a"
+      },
+      {
+        "key": "clockDisplay",
+        "label": "Clock display",
+        "labelKey": "plugin.clock.field.clockDisplay",
+        "type": "select",
+        "default": "analog",
+        "options": [
+          {
+            "value": "analog",
+            "label": "Analog",
+            "labelKey": "plugin.opt.analog"
+          },
+          {
+            "value": "digital",
+            "label": "Digital",
+            "labelKey": "plugin.opt.digital"
+          }
+        ],
+        "description": "How the right-sidebar clock is shown.",
+        "descriptionKey": "auto.36b891dc73ec"
+      },
+      {
+        "key": "stopwatchDisplay",
+        "label": "Stopwatch display",
+        "labelKey": "plugin.clock.field.stopwatchDisplay",
+        "type": "select",
+        "default": "analog",
+        "options": [
+          {
+            "value": "analog",
+            "label": "Analog",
+            "labelKey": "auto.830bf70f56c5"
+          },
+          {
+            "value": "digital",
+            "label": "Digital",
+            "labelKey": "auto.bbe5befacfed"
+          }
+        ],
+        "description": "How the stopwatch is shown.",
+        "descriptionKey": "auto.ebf34719ff70"
+      },
+      {
+        "key": "seconds",
+        "label": "Show second hand",
+        "labelKey": "plugin.clock.field.secondHand",
+        "type": "boolean",
+        "default": true,
+        "description": "Sweep a second hand across the analog clock face.",
+        "descriptionKey": "auto.e4608fde30c3"
+      },
+      {
+        "key": "alarmSound",
+        "label": "Alarm sound",
+        "labelKey": "plugin.clock.field.alarmSound",
+        "type": "select",
+        "default": "beep",
+        "options": [
+          {
+            "value": "beep",
+            "label": "Beep",
+            "labelKey": "plugin.opt.beep"
+          },
+          {
+            "value": "chime",
+            "label": "Chime",
+            "labelKey": "plugin.opt.chime"
+          },
+          {
+            "value": "pulse",
+            "label": "Pulse",
+            "labelKey": "plugin.opt.pulse"
+          },
+          {
+            "value": "radar",
+            "label": "Radar",
+            "labelKey": "plugin.opt.radar"
+          },
+          {
+            "value": "bell",
+            "label": "Bell",
+            "labelKey": "plugin.opt.bell"
+          }
+        ],
+        "description": "Default sound for new alarms.",
+        "descriptionKey": "auto.2193e49f6961"
+      },
+      {
+        "key": "alarmSnooze",
+        "label": "Snooze length (minutes)",
+        "labelKey": "plugin.clock.field.snooze",
+        "type": "number",
+        "default": 9,
+        "description": "How long the Snooze button postpones a ringing alarm.",
+        "descriptionKey": "auto.242e9fcd2674"
+      },
+      {
+        "key": "footerTime",
+        "label": "Show time in the footer",
+        "labelKey": "plugin.clock.field.footerTime",
+        "type": "boolean",
+        "default": true,
+        "description": "Add a live clock to the footer (place it via Settings → Footer Rail).",
+        "descriptionKey": "auto.9b4c3ee037ea"
+      },
+      {
+        "key": "footerSeconds",
+        "label": "Footer time shows seconds",
+        "labelKey": "plugin.clock.field.footerSeconds",
+        "type": "boolean",
+        "default": true,
+        "description": "Include seconds in the footer clock readout.",
+        "descriptionKey": "auto.36882bb3a7cd"
+      },
+      {
+        "key": "pomodoroWork",
+        "label": "Pomodoro focus length (minutes)",
+        "labelKey": "plugin.clock.field.pomodoroFocus",
+        "type": "number",
+        "default": 25
+      },
+      {
+        "key": "pomodoroShort",
+        "label": "Pomodoro short break (minutes)",
+        "labelKey": "plugin.clock.field.pomodoroShort",
+        "type": "number",
+        "default": 5
+      },
+      {
+        "key": "pomodoroLong",
+        "label": "Pomodoro long break (minutes)",
+        "labelKey": "plugin.clock.field.pomodoroLong",
+        "type": "number",
+        "default": 15
+      },
+      {
+        "key": "pomodoroCycles",
+        "label": "Focus sessions before a long break",
+        "labelKey": "plugin.clock.field.pomodoroCycles",
+        "type": "number",
+        "default": 4
+      },
+      {
+        "key": "pomodoroProfiles",
+        "label": "Pomodoro profiles",
+        "type": "text",
+        "default": "",
+        "labelKey": "clock.setting.pomodoroProfiles"
+      },
+      {
+        "key": "pomodoroActiveProfile",
+        "label": "Active Pomodoro profile",
+        "type": "text",
+        "default": "focus",
+        "labelKey": "clock.setting.pomodoroActiveProfile"
+      },
+      {
+        "key": "timerOrder",
+        "label": "Timer order",
+        "type": "text",
+        "default": "",
+        "labelKey": "clock.setting.timerOrder"
+      },
+      {
+        "key": "alarmOrder",
+        "label": "Alarm order",
+        "type": "text",
+        "default": "",
+        "labelKey": "clock.setting.alarmOrder"
+      }
+    ]
+  },
+  "provides": [
+    {
+      "id": "workspace.surface",
+      "kind": "extension",
+      "version": "1.0.0"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "alarms",
+      "store": "durable",
+      "version": 1,
+      "title": "Alarms",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "text"
+        },
+        "hour": {
+          "type": "integer"
+        },
+        "minute": {
+          "type": "integer"
+        },
+        "label": {
+          "type": "text"
+        },
+        "date": {
+          "type": "text",
+          "nullable": true
+        },
+        "sound": {
+          "type": "text",
+          "enum": [
+            "beep",
+            "chime",
+            "pulse",
+            "radar",
+            "bell"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "snoozedUntil": {
+          "type": "integer",
+          "nullable": true
+        }
+      },
+      "titleKey": "auto.131dd3d64a58"
+    },
+    {
+      "id": "alarm_days",
+      "store": "durable",
+      "version": 1,
+      "title": "Alarm days",
+      "primaryKey": [
+        "alarmId",
+        "day"
+      ],
+      "columns": {
+        "alarmId": {
+          "type": "text"
+        },
+        "day": {
+          "type": "integer"
+        }
+      },
+      "relations": [
+        {
+          "kind": "foreign-key",
+          "columns": [
+            "alarmId"
+          ],
+          "targetDataset": "alarms",
+          "targetColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "titleKey": "auto.151cda416243"
+    },
+    {
+      "id": "timers",
+      "store": "durable",
+      "version": 1,
+      "title": "Timers",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "text"
+        },
+        "label": {
+          "type": "text"
+        },
+        "duration": {
+          "type": "integer"
+        },
+        "endsAt": {
+          "type": "integer"
+        },
+        "remaining": {
+          "type": "integer"
+        },
+        "running": {
+          "type": "boolean"
+        }
+      },
+      "titleKey": "auto.841cd03a97cd"
+    },
+    {
+      "id": "stopwatch_state",
+      "store": "durable",
+      "version": 1,
+      "title": "Stopwatch state",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "text"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "startedAt": {
+          "type": "integer"
+        },
+        "elapsed": {
+          "type": "integer"
+        }
+      },
+      "titleKey": "auto.41d99791ebde"
+    },
+    {
+      "id": "stopwatch_laps",
+      "store": "durable",
+      "version": 1,
+      "title": "Stopwatch laps",
+      "primaryKey": [
+        "stopwatchId",
+        "position"
+      ],
+      "columns": {
+        "stopwatchId": {
+          "type": "text"
+        },
+        "position": {
+          "type": "integer"
+        },
+        "elapsed": {
+          "type": "integer"
+        }
+      },
+      "relations": [
+        {
+          "kind": "foreign-key",
+          "columns": [
+            "stopwatchId"
+          ],
+          "targetDataset": "stopwatch_state",
+          "targetColumns": [
+            "id"
+          ],
+          "onDelete": "cascade"
+        }
+      ],
+      "titleKey": "auto.620db2fac1a9"
+    },
+    {
+      "id": "pomodoro_state",
+      "store": "durable",
+      "version": 1,
+      "title": "Pomodoro state",
+      "primaryKey": [
+        "id"
+      ],
+      "columns": {
+        "id": {
+          "type": "text"
+        },
+        "phase": {
+          "type": "text",
+          "enum": [
+            "work",
+            "short",
+            "long"
+          ]
+        },
+        "cycle": {
+          "type": "integer"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "endsAt": {
+          "type": "integer"
+        },
+        "remaining": {
+          "type": "integer"
+        }
+      },
+      "titleKey": "auto.e4617b66fec7"
+    }
+  ],
+  "locales": {
+    "en": "runtime/locales/en.json",
+    "de": "runtime/locales/de.json",
+    "es": "runtime/locales/es.json",
+    "fr": "runtime/locales/fr.json",
+    "zh-CN": "runtime/locales/zh-CN.json"
+  },
+  "runtime": {
+    "ui": "runtime/index.js"
+  }
+}
