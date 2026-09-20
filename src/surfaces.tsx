@@ -1,5 +1,6 @@
 import { PLUGIN_SURFACE_V1, type ValleyPluginApi } from '@valley/plugin-sdk'
-import type { ClockStore, Mode } from './index'
+import type { ClockStore } from './store'
+import type { Mode } from './preferences'
 import { uiText } from './localization'
 
 const modes: Mode[] = ['clock', 'alarm', 'stopwatch', 'timer', 'pomodoro']

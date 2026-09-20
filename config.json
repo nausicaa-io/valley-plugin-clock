@@ -1,6 +1,7 @@
 {
   "icon": "clock",
   "main": "runtime/index.js",
+  "indexState": "scoped",
   "drivers": [
     "notifications"
   ],

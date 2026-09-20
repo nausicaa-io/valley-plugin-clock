@@ -5,5 +5,5 @@ import { join as joinStylePath } from 'node:path'
 import { overflowMenuDiagnostics } from '@valley/plugin-tools'
 
 it('gives alarmRow overflow actions semantic icons', () => {
-  expect(overflowMenuDiagnostics(readFileSync(joinStylePath(process.cwd(), 'src/index.tsx'), 'utf8'), ['alarmRow'])).toEqual([])
+  expect(overflowMenuDiagnostics(readFileSync(joinStylePath(process.cwd(), 'src/views.tsx'), 'utf8'), ['alarmRow'])).toEqual([])
 })
