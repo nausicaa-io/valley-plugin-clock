@@ -40,7 +40,7 @@ describe('Clock settings and registration ownership', () => {
     await act(async () => { store.notify(); await mock.api.settings.set('seconds', false) })
     expect(screen.getByLabelText('Search cities…')).toBe(search)
     expect(search.value).toBe('Tok')
-    expect(vi.mocked(mock.api.registerView)).toHaveBeenCalledTimes(3)
+    expect(vi.mocked(mock.api.registerView)).toHaveBeenCalledTimes(2)
     expect(interval).toHaveBeenCalledOnce()
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     expect(search.value).toBe('Tok')
@@ -60,7 +60,7 @@ describe('Clock settings and registration ownership', () => {
     disposers.push(dispose)
     const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('Missing Clock store') })
     await store.ready
-    expect(mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1)).toHaveLength(2)
+    expect(mock.api.interop.extensions.providers(PLUGIN_SURFACE_V1)).toHaveLength(1)
     await mock.api.commands.execute('clock:sw-start', {})
     expect(await mock.api.data.dataset('stopwatch_state').get({ id: 'stopwatch' })).toMatchObject({ running: true })
     const profiles = store.pomoProfiles()

@@ -16,10 +16,10 @@ export function registerClockSurfaces(api: ValleyPluginApi, store: ClockStore): 
         : undefined
     return { title: modeLabel(mode), view: { mode }, ...(item ? { item } : {}) }
   }
-  const surfaces = ['right_sidebar', 'footer'] as const
-  const offs = surfaces.map((surface) => api.interop.extensions.provide(PLUGIN_SURFACE_V1, {
+  const surface = 'right_sidebar'
+  const off = api.interop.extensions.provide(PLUGIN_SURFACE_V1, {
     id: `clock.${surface}`, surface, getSnapshot: snapshot, subscribe: store.subscribe,
-    restore: async (raw, _instance, options) => {
+    restore: async (raw) => {
       await store.ready
       const mode = raw.mode ?? 'clock'
       if (!modes.includes(mode as Mode)) throw new Error(uiText('surface.invalid'))
@@ -30,8 +30,7 @@ export function registerClockSurfaces(api: ValleyPluginApi, store: ClockStore): 
       store.state.selectedTimer = typeof raw.timerId === 'string' ? raw.timerId : null
       store.state.selectedCity = typeof raw.city === 'string' ? raw.city : null
       store.setMode(mode as Mode)
-      if (surface === 'footer' && !options?.background) api.workspace.revealOwnPanel('right_sidebar')
     }
-  }))
-  return () => offs.forEach((off) => off())
+  })
+  return off
 }

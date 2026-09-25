@@ -6,16 +6,11 @@
     "notifications"
   ],
   "uiSlots": {
-    "right_sidebar": "clock.panel",
-    "footer": "clock.footer"
+    "right_sidebar": "clock.panel"
   },
   "slotDefaults": {
     "right_sidebar": {
       "order": 40
-    },
-    "footer": {
-      "side": "right",
-      "order": 70
     }
   },
   "notifications": [
@@ -226,24 +221,6 @@
         "default": 9,
         "description": "How long the Snooze button postpones a ringing alarm.",
         "descriptionKey": "auto.242e9fcd2674"
-      },
-      {
-        "key": "footerTime",
-        "label": "Show time in the footer",
-        "labelKey": "plugin.clock.field.footerTime",
-        "type": "boolean",
-        "default": true,
-        "description": "Add a live clock to the footer (place it via Settings → Footer Rail).",
-        "descriptionKey": "auto.9b4c3ee037ea"
-      },
-      {
-        "key": "footerSeconds",
-        "label": "Footer time shows seconds",
-        "labelKey": "plugin.clock.field.footerSeconds",
-        "type": "boolean",
-        "default": true,
-        "description": "Include seconds in the footer clock readout.",
-        "descriptionKey": "auto.36882bb3a7cd"
       },
       {
         "key": "pomodoroWork",

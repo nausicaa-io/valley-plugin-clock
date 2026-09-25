@@ -1370,43 +1370,6 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
     )
   }
 
-  // ---- Footer live-time item --------------------------------------------
-  const FooterTime = (): ReturnType<typeof h> | null => {
-    const s = api.settings.get()
-    const { timeFormat } = useHostState()
-    const enabled = s.footerTime !== false
-    const withSeconds = s.footerSeconds !== false
-    const [, force] = React.useState(0)
-    React.useEffect(() => {
-      if (!enabled) return
-      // Tick every second with seconds, else align to the next minute.
-      let timer = 0
-      const schedule = (): void => {
-        const now = Date.now()
-        const delay = withSeconds ? 1000 - (now % 1000) : 60000 - (now % 60000)
-        timer = window.setTimeout(() => {
-          force((n) => n + 1)
-          schedule()
-        }, delay)
-      }
-      schedule()
-      return () => window.clearTimeout(timer)
-    }, [withSeconds, enabled])
-    if (!enabled) return null
-    const text = fmtWallTime(new Date(), withSeconds, timeFormat === '12h')
-    return h(
-      'button',
-      {
-        type: 'button',
-        className: 'status-item status-clock',
-        onClick: () => api.workspace.revealOwnPanel('right_sidebar'),
-        title: uiText('auto.04f6b3ea183e'),
-        style: { fontVariantNumeric: 'tabular-nums', fontFeatureSettings: '"tnum"' }
-      },
-      text
-    )
-  }
-
   const SettingsView = createClockSettings(api, store, { worldAddSelect, worldList, pomodoroIcon: tabIcon.pomodoro })
-  return { Panel, FooterTime, SettingsView }
+  return { Panel, SettingsView }
 }

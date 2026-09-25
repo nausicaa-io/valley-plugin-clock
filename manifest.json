@@ -3,7 +3,7 @@
   "id": "clock",
   "name": "Clock",
   "version": "3.0.0",
-  "description": "Clock with world times, alarms, stopwatch, multiple timers and Pomodoro \u2014 in the right sidebar and the footer.",
+  "description": "Clock with world times, alarms, stopwatch, multiple timers and Pomodoro in the right sidebar.",
   "author": [
     "Yanik"
   ],

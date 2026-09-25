@@ -358,8 +358,6 @@ export function createClockSettings(api: ValleyPluginApi, store: ClockStore, { w
       { style: { width: '100%' } },
       displayRow(uiText('auto.0bb80737096b'), uiText('auto.28ec48330176'), 'clockDisplay'),
       toggleRow(uiText('auto.f7172f2029ed'), uiText('auto.e4608fde30c3'), 'seconds'),
-      toggleRow(uiText('auto.8a0bf5876aaf'), uiText('auto.9b4c3ee037ea'), 'footerTime'),
-      toggleRow(uiText('auto.aaa7a6f89cdb'), uiText('auto.36882bb3a7cd'), 'footerSeconds'),
       h('h4', { key: 'views', className: 'settings-label clock-settings-label' }, uiText('auto.3286a93a040f')),
       ...VIEW_ROWS.map(([view, label, desc]) => {
         const key = VIEW_SETTING[view]

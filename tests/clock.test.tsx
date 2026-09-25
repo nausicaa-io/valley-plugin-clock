@@ -316,14 +316,14 @@ describe('clock pure helpers', () => {
 })
 
 describe('clock plugin', () => {
-  it('registers right-sidebar panel, footer and settings views via register(api)', () => {
+  it('registers right-sidebar panel and settings views but no footer view', () => {
     const { api } = createMockValleyApi({ manifest: { id: 'clock' } })
     register(api)
     const keys = (api.registerView as unknown as { mock: { calls: [string][] } }).mock.calls.map(
       (c) => c[0]
     )
     expect(keys).toContain('clock.panel')
-    expect(keys).toContain('clock.footer')
+    expect(keys).not.toContain('clock.footer')
     expect(keys).toContain('clock.settings')
   })
 
