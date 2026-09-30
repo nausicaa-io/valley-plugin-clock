@@ -1,0 +1,606 @@
+{
+  "icon": "icon.svg",
+  "main": "runtime/index.js",
+  "indexState": "scoped",
+  "drivers": [
+    "notifications"
+  ],
+  "uiSlots": {
+    "right_sidebar": "clock.panel"
+  },
+  "slotDefaults": {
+    "right_sidebar": {
+      "order": 40
+    }
+  },
+  "notifications": [
+    {
+      "id": "alarm",
+      "label": "Alarm",
+      "labelKey": "plugin.clock.notification.alarm",
+      "description": "Rings until you stop or snooze it, and fires even with every window closed.",
+      "descriptionKey": "plugin.clock.notification.alarmDesc",
+      "defaultChannel": "both",
+      "ringable": true,
+      "soundDirectory": "assets/alarm-sounds"
+    },
+    {
+      "id": "timer",
+      "label": "Timer finished",
+      "labelKey": "plugin.clock.notification.timer",
+      "description": "Rings until you stop it.",
+      "descriptionKey": "plugin.clock.notification.timerDesc",
+      "defaultChannel": "both",
+      "ringable": true,
+      "soundDirectory": "assets/alarm-sounds"
+    },
+    {
+      "id": "pomodoro",
+      "label": "Pomodoro phase changed",
+      "labelKey": "plugin.clock.notification.pomodoro",
+      "description": "Announces the switch between focus and break. Does not ring.",
+      "descriptionKey": "plugin.clock.notification.pomodoroDesc",
+      "defaultChannel": "system"
+    }
+  ],
+  "settingsView": "clock.settings",
+  "settingsSections": [
+    {
+      "id": "world",
+      "label": "World clock",
+      "labelKey": "plugin.clock.section.world",
+      "icon": "world",
+      "visibleWhenSetting": "showWorld"
+    },
+    {
+      "id": "alarm",
+      "label": "Alarm",
+      "labelKey": "plugin.clock.section.alarm",
+      "icon": "alarm",
+      "visibleWhenSetting": "showAlarm",
+      "storage": [
+        ".valley/plugins/data/clock/config.json",
+        ".valley/plugins/data/clock/alarms.jsonl",
+        ".valley/assets/alarm-sounds/"
+      ]
+    },
+    {
+      "id": "stopwatch",
+      "label": "Stopwatch",
+      "labelKey": "plugin.clock.section.stopwatch",
+      "icon": "stopwatch",
+      "visibleWhenSetting": "showStopwatch"
+    },
+    {
+      "id": "timer",
+      "label": "Timer",
+      "labelKey": "plugin.clock.section.timer",
+      "icon": "timer",
+      "visibleWhenSetting": "showTimer"
+    },
+    {
+      "id": "pomodoro",
+      "label": "Pomodoro",
+      "labelKey": "plugin.clock.section.pomodoro",
+      "icon": "pomodoro",
+      "visibleWhenSetting": "showPomodoro"
+    }
+  ],
+  "settingsSchema": {
+    "fields": [
+      {
+        "key": "showWorld",
+        "label": "Show World clock",
+        "labelKey": "plugin.clock.field.showWorld",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the world clock list in the Clock tab and its own settings section.",
+        "descriptionKey": "auto.2a8a7da69f8f"
+      },
+      {
+        "key": "showAlarm",
+        "label": "Show Alarm",
+        "labelKey": "plugin.clock.field.showAlarm",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Alarm tab and its own settings section.",
+        "descriptionKey": "auto.a0fd69ac917c"
+      },
+      {
+        "key": "showStopwatch",
+        "label": "Show Stopwatch",
+        "labelKey": "plugin.clock.field.showStopwatch",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Stopwatch tab and its own settings section.",
+        "descriptionKey": "auto.d8127bcecbf4"
+      },
+      {
+        "key": "showTimer",
+        "label": "Show Timer",
+        "labelKey": "plugin.clock.field.showTimer",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Timer tab and its own settings section.",
+        "descriptionKey": "auto.e2b64297512f"
+      },
+      {
+        "key": "showPomodoro",
+        "label": "Show Pomodoro",
+        "labelKey": "plugin.clock.field.showPomodoro",
+        "type": "boolean",
+        "default": true,
+        "description": "Show the Pomodoro tab and its own settings section.",
+        "descriptionKey": "auto.5b9be3e4f35a"
+      },
+      {
+        "key": "stopwatchDisplay",
+        "label": "Stopwatch display",
+        "labelKey": "plugin.clock.field.stopwatchDisplay",
+        "type": "select",
+        "default": "analog",
+        "options": [
+          {
+            "value": "analog",
+            "label": "Analog",
+            "labelKey": "auto.830bf70f56c5"
+          },
+          {
+            "value": "digital",
+            "label": "Digital",
+            "labelKey": "auto.bbe5befacfed"
+          }
+        ],
+        "description": "How the stopwatch is shown.",
+        "descriptionKey": "auto.ebf34719ff70"
+      },
+      {
+        "key": "seconds",
+        "label": "Show second hand",
+        "labelKey": "plugin.clock.field.secondHand",
+        "type": "boolean",
+        "default": true,
+        "description": "Sweep a second hand across the analog clock face.",
+        "descriptionKey": "auto.e4608fde30c3"
+      },
+      {
+        "key": "alarmSound",
+        "label": "Alarm sound",
+        "labelKey": "plugin.clock.field.alarmSound",
+        "type": "text",
+        "default": "beep",
+        "description": "Default sound for new alarms.",
+        "descriptionKey": "auto.2193e49f6961"
+      },
+      {
+        "key": "alarmSnooze",
+        "label": "Snooze length (minutes)",
+        "labelKey": "plugin.clock.field.snooze",
+        "type": "number",
+        "default": 9,
+        "description": "How long the Snooze button postpones a ringing alarm.",
+        "descriptionKey": "auto.242e9fcd2674"
+      },
+      {
+        "key": "pomodoroWork",
+        "label": "Pomodoro focus length (minutes)",
+        "labelKey": "plugin.clock.field.pomodoroFocus",
+        "type": "number",
+        "default": 25
+      },
+      {
+        "key": "pomodoroShort",
+        "label": "Pomodoro short break (minutes)",
+        "labelKey": "plugin.clock.field.pomodoroShort",
+        "type": "number",
+        "default": 5
+      },
+      {
+        "key": "pomodoroLong",
+        "label": "Pomodoro long break (minutes)",
+        "labelKey": "plugin.clock.field.pomodoroLong",
+        "type": "number",
+        "default": 15
+      },
+      {
+        "key": "pomodoroCycles",
+        "label": "Focus sessions before a long break",
+        "labelKey": "plugin.clock.field.pomodoroCycles",
+        "type": "number",
+        "default": 4
+      },
+      {
+        "key": "pomodoroProfiles",
+        "label": "Pomodoro profiles",
+        "type": "text",
+        "default": "",
+        "labelKey": "clock.setting.pomodoroProfiles"
+      },
+      {
+        "key": "pomodoroActiveProfile",
+        "label": "Active Pomodoro profile",
+        "type": "text",
+        "default": "focus",
+        "labelKey": "clock.setting.pomodoroActiveProfile"
+      },
+      {
+        "key": "timerOrder",
+        "label": "Timer order",
+        "type": "text",
+        "default": "",
+        "labelKey": "clock.setting.timerOrder"
+      },
+      {
+        "key": "alarmOrder",
+        "label": "Alarm order",
+        "type": "text",
+        "default": "",
+        "labelKey": "clock.setting.alarmOrder"
+      }
+    ]
+  },
+  "provides": [
+    {
+      "id": "workspace.surface",
+      "kind": "extension",
+      "version": "1.0.0"
+    },
+    {
+      "id": "workspace.bookmark",
+      "kind": "service",
+      "version": "1.0.0"
+    }
+  ],
+  "locales": {
+    "en": "runtime/locales/en.json",
+    "de": "runtime/locales/de.json",
+    "es": "runtime/locales/es.json",
+    "fr": "runtime/locales/fr.json",
+    "zh-CN": "runtime/locales/zh-CN.json"
+  },
+  "runtime": {
+    "ui": "runtime/index.js",
+    "backend": "runtime/backend.js",
+    "services": [
+      {
+        "id": "workflow.provider",
+        "version": "1.0.0",
+        "method": "workflow.execute",
+        "request": {
+          "type": "unknown"
+        },
+        "response": {
+          "type": "unknown"
+        },
+        "operation": true,
+        "events": {
+          "timer.finished": {
+            "type": "unknown"
+          },
+          "alarm.fired": {
+            "type": "unknown"
+          }
+        },
+        "metadata": {
+          "workflow": {
+            "providerId": "clock",
+            "providerVersion": "1.0.0",
+            "nodes": [
+              {
+                "id": "timer.finished",
+                "type": "trigger",
+                "displayName": "Timer finished",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "alarm.fired",
+                "type": "trigger",
+                "displayName": "Alarm fired",
+                "inputs": [],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {},
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "timer.start",
+                "type": "action",
+                "displayName": "Start timer",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "seconds": {
+                      "type": "number",
+                      "minimum": 1,
+                      "maximum": 3599999,
+                      "title": "Duration in seconds",
+                      "default": 300
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 40,
+                      "title": "Name"
+                    }
+                  },
+                  "required": [
+                    "seconds"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "timer.pause",
+                "type": "action",
+                "displayName": "Pause timer",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "Item ID"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "timer.resume",
+                "type": "action",
+                "displayName": "Resume timer",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "Item ID"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "timer.cancel",
+                "type": "action",
+                "displayName": "Cancel timer",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "Item ID"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "alarm.enable",
+                "type": "action",
+                "displayName": "Enable alarm",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "Item ID"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "alarm.disable",
+                "type": "action",
+                "displayName": "Disable alarm",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "title": "Item ID"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "id": "alarm.create",
+                "type": "action",
+                "displayName": "Create alarm",
+                "inputs": [
+                  {
+                    "id": "input",
+                    "label": "Input",
+                    "dataType": "json"
+                  }
+                ],
+                "outputs": [
+                  {
+                    "id": "output",
+                    "label": "Output",
+                    "dataType": "json"
+                  }
+                ],
+                "parameterSchema": {
+                  "type": "object",
+                  "properties": {
+                    "hour": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 23,
+                      "title": "Hour"
+                    },
+                    "minute": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 59,
+                      "title": "Minute"
+                    },
+                    "name": {
+                      "type": "string",
+                      "title": "Name"
+                    },
+                    "date": {
+                      "type": "string",
+                      "title": "Date"
+                    },
+                    "days": {
+                      "type": "array",
+                      "title": "Weekdays (Sunday = 0)",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                      },
+                      "maxItems": 7,
+                      "default": []
+                    }
+                  },
+                  "required": [
+                    "hour",
+                    "minute"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "activation": {
+      "backend": [
+        "background",
+        "capability"
+      ]
+    }
+  },
+  "permissions": {
+    "storage": {
+      "metadata": [
+        "assets/alarm-sounds"
+      ]
+    }
+  }
+}

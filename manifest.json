@@ -1,0 +1,17 @@
+{
+  "apiVersion": 5,
+  "id": "clock",
+  "name": "Clock",
+  "version": "3.0.0",
+  "description": "Clock with world times, alarms, stopwatch, multiple timers and Pomodoro in the right sidebar.",
+  "author": [
+    "nausicaa"
+  ],
+  "authorUrl": [
+    "https://github.com/nausicaa-io"
+  ],
+  "license": "MIT",
+  "minAppVersion": "0.1.0",
+  "isDesktopOnly": true,
+  "enabled": true
+}
