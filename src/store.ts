@@ -2,7 +2,7 @@ import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { uiText } from './localization'
 import type { ClockTimer } from './timers'
 import { createClockClient } from './clockClient'
-import { createStopwatch, type SwState } from './stopwatch'
+import type { SwState } from './stopwatch'
 import type { ClockAlarm } from './alarms'
 import { type PomoConfig, type PomoState, type PomodoroProfile } from './pomodoro'
 import { SOUND_IDS, SOUND_LABEL, createSoundPlayer, type AlarmSoundId, type SoundPlayback } from './sounds'
@@ -67,6 +67,7 @@ export interface ClockStore {
   syncSettings(): void
   // actions
   setMode(m: Mode): void
+  swReady(): boolean
   swStart(): void
   swStop(): void
   swLap(): void
@@ -133,7 +134,7 @@ function createStore(api: ValleyPluginApi): ClockStore {
     notify: () => notify(),
     persistenceError: () => new Error(uiText('surface.invalid'))
   })
-  const stopwatch = createStopwatch({ api: () => apiRef, enqueue, now: () => Date.now(), notify: () => notify() })
+  const stopwatch = clockClient.stopwatch
   const pomodoro = clockClient.pomodoro
 
   const state: ClockStore['state'] = {
@@ -225,6 +226,7 @@ function createStore(api: ValleyPluginApi): ClockStore {
       state.mode = m
       notify()
     },
+    swReady: stopwatch.ready,
     swStart: stopwatch.start,
     swStop: stopwatch.stop,
     swLap: stopwatch.lap,

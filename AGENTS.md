@@ -1,7 +1,7 @@
 # Clock integration rules
 
 - Read `README.md` and the workspace plugin skill before changes.
-- The backend Clock owner is the only writer and scheduler for alarms and timers. Renderer stores mirror its snapshots and issue mutations through the SDK; closing a surface must not stop its background operation.
+- The backend Clock owner is the only writer for stopwatch sessions and the only writer and scheduler for alarms and timers. Renderer stores mirror its snapshots and issue mutations through the SDK; closing a surface must not stop its background operation.
 - Preserve JSON/JSONL storage, stopwatch and Pomodoro sessions, UI undo, timer limits, and existing settings. Never introduce a dataset migration.
 - Refill recurring alarm schedules after occurrences. Use host occurrence IDs for persisted deduplication; repeated ring ticks and missed catch-up occurrences must not trigger Workflow.
 - Preserve opaque host causal receipts on records and restore them when publishing completion events. Report uncertain side effects without automatic retries.

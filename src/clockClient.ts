@@ -2,6 +2,7 @@ import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import type { ClockTimer } from './timers'
 import type { ClockAlarm } from './alarms'
 import { isSoundId, type AlarmSoundId } from './soundLibrary'
+import type { SwState } from './stopwatch'
 import type { ClockSnapshot } from './backend/clockOwner'
 import type { PomoConfig, PomodoroProfile } from './pomodoro'
 
@@ -15,7 +16,7 @@ interface ClockClientPorts {
 }
 
 export function createClockClient(ports: ClockClientPorts) {
-  let current: ClockSnapshot = { session: '', revision: -1, timers: [], alarms: [], ringing: [], pomo: { state: { phase: 'work', cycle: 0, running: false, endsAt: 0, remaining: 1500000 }, profiles: [], profileId: 'focus', config: { work: 25, short: 5, long: 15, cycles: 4 } } }
+  let current: ClockSnapshot = { session: '', revision: -1, stopwatch: { revision: -1, state: { running: false, startedAt: 0, elapsed: 0, laps: [] } }, timers: [], alarms: [], ringing: [], pomo: { state: { phase: 'work', cycle: 0, running: false, endsAt: 0, remaining: 1500000 }, profiles: [], profileId: 'focus', config: { work: 25, short: 5, long: 15, cycles: 4 } } }
   let base = current
   let serial = 0
   let refreshPending: Promise<void> | undefined
@@ -52,7 +53,7 @@ export function createClockClient(ports: ClockClientPorts) {
     const snapshot = await ports.api().backend.call<ClockSnapshot>('clock.snapshot')
     if (observed === generation) accept(snapshot)
   })().finally(() => { refreshPending = undefined })
-  const send = (method: string, args: unknown[], apply: (state: ClockSnapshot) => void) => {
+  const send = (method: string, args: unknown[], apply: (state: ClockSnapshot) => void, guard?: { expectedSession: string; expectedRevision: number }) => {
     const token = ++serial
     const observed = generation
     const api = ports.api()
@@ -60,7 +61,7 @@ export function createClockClient(ports: ClockClientPorts) {
     render()
     ports.enqueue(async () => {
       try {
-        const result = await api.backend.call<{ snapshot: ClockSnapshot }>('clock.mutate', { method, args })
+        const result = await api.backend.call<{ snapshot: ClockSnapshot }>('clock.mutate', { method, args, ...guard })
         if (observed !== generation) return
         overlays.delete(token)
         accept(result.snapshot)
@@ -71,6 +72,13 @@ export function createClockClient(ports: ClockClientPorts) {
         throw error
       }
     })
+  }
+  const stopwatchElapsed = (): number => current.stopwatch.state.elapsed + (current.stopwatch.state.running ? Math.max(0, Date.now() - current.stopwatch.state.startedAt) : 0)
+  const changeStopwatch = (method: string, next: SwState): void => {
+    if (!current.session) return
+    const guard = { expectedSession: current.session, expectedRevision: current.stopwatch.revision }
+    const stopwatch = { state: structuredClone(next), revision: guard.expectedRevision + 1 }
+    send(method, [], state => { state.stopwatch = structuredClone(stopwatch) }, guard)
   }
   const timer = (id?: string) => id ? current.timers.find(value => value.id === id) : current.timers.at(-1)
   const alarm = (id: string) => current.alarms.find(value => value.id === id)
@@ -103,6 +111,16 @@ export function createClockClient(ports: ClockClientPorts) {
       void refresh().catch(() => {})
       const registered = offs
       return () => { registered.forEach(off => off()); if (offs === registered) { offs = []; generation++; overlays.clear(); refreshPending = undefined; suspend() } }
+    },
+    stopwatch: {
+      get state() { return current.stopwatch.state },
+      ready: () => Boolean(current.session),
+      elapsed: stopwatchElapsed,
+      load: refresh, resumeLoading: refresh, suspend: () => {},
+      start: () => { if (!current.stopwatch.state.running) changeStopwatch('stopwatch.start', { ...current.stopwatch.state, running: true, startedAt: Date.now() }) },
+      stop: () => { if (current.stopwatch.state.running) changeStopwatch('stopwatch.stop', { ...current.stopwatch.state, running: false, elapsed: stopwatchElapsed(), startedAt: 0 }) },
+      lap: () => { if (current.stopwatch.state.running) changeStopwatch('stopwatch.lap', { ...current.stopwatch.state, laps: [stopwatchElapsed(), ...current.stopwatch.state.laps] }) },
+      reset: () => changeStopwatch('stopwatch.reset', { running: false, startedAt: 0, elapsed: 0, laps: [] })
     },
     pomodoro: {
       get state() { return current.pomo.state },

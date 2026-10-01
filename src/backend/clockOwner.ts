@@ -1,4 +1,5 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
+import { createStopwatch, type SwState } from '../stopwatch'
 import { createTimers, fmtCountdown, type ClockTimer } from '../timers'
 import { createAlarms, type ClockAlarm } from '../alarms'
 import { readStringList } from '../preferences'
@@ -11,11 +12,12 @@ export interface ClockSnapshot {
   timers: ClockTimer[]
   alarms: ClockAlarm[]
   ringing: string[]
+  stopwatch: { revision: number; state: SwState }
   pomo: { state: PomoState; profiles: PomodoroProfile[]; profileId: string; config: PomoConfig }
 }
 
-type OperationApi = Pick<PluginBackendApi, 'data' | 'settings' | 'notifications' | 'services'>
-export type ClockMutation = { method: string; args: unknown[] }
+type OperationApi = Pick<PluginBackendApi, 'data' | 'settings' | 'notifications' | 'services'> & { rpc: Pick<PluginBackendApi['rpc'], 'emit'> }
+export type ClockMutation = { method: string; args: unknown[]; expectedSession?: string; expectedRevision?: number }
 const maximumSeconds = 999 * 3600 + 3599
 const label = (value: unknown) => {
   if (value === undefined) return ''
@@ -31,6 +33,7 @@ const identifier = (value: unknown): string | undefined => {
 export function createClockOwner(api: PluginBackendApi) {
   let active = true
   let revision = 0
+  let stopwatchRevision = 0
   const session = `clock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   let sequence = 0
   let operationApi: OperationApi = api
@@ -51,19 +54,20 @@ export function createClockOwner(api: PluginBackendApi) {
   const rootModelApi = { data: api.data, settings: api.settings, notifications: queuedNotifications }
   let modelApi = rootModelApi
   const models = () => ({
+    stopwatch: createStopwatch({ api: () => modelApi, enqueue, now: () => Date.now(), notify }),
     pomodoro: createPomodoro({ api: () => modelApi, enqueue, now: Date.now, id, notify, sound: () => null, title: () => api.i18n.t('auto.212e4618d030'), phaseName: phase => api.i18n.t(phase === 'work' ? 'auto.fe7f55b8bf68' : phase === 'short' ? 'auto.19e173199148' : 'auto.03485170c086'), persistenceError: () => new Error('Could not save Clock settings.') }),
     timers: createTimers({ api: () => modelApi, enqueue, now: Date.now, id, notify, sound: () => null, title: () => api.i18n.t('auto.9d9cec22f36f'), formatDuration: fmtCountdown, persistenceError: () => new Error('Could not save Clock settings.') }),
     alarms: createAlarms({ api: () => modelApi, enqueue, now: Date.now, id, notify, removed: () => {}, sound: () => null, title: () => api.i18n.t('auto.25f8c55de811'), persistenceError: () => new Error('Could not save Clock settings.') })
   })
-  let { timers, alarms, pomodoro } = models()
-  const snapshot = (): ClockSnapshot => structuredClone({ session, revision, timers: timers.items, alarms: alarms.items, ringing: alarms.ringing, pomo: { state: pomodoro.state, profiles: pomodoro.profiles, profileId: pomodoro.profileId, config: pomodoro.config() } })
-  const publish = () => { revision++; api.rpc.emit('clock.state', snapshot()) }
+  let { timers, alarms, pomodoro, stopwatch } = models()
+  const snapshot = (): ClockSnapshot => structuredClone({ session, revision, timers: timers.items, alarms: alarms.items, ringing: alarms.ringing, stopwatch: { revision: stopwatchRevision, state: stopwatch.state }, pomo: { state: pomodoro.state, profiles: pomodoro.profiles, profileId: pomodoro.profileId, config: pomodoro.config() } })
+  const publish = () => { revision++; operationApi.rpc.emit('clock.state', snapshot()) }
   const flush = async () => {
     while (writes.length) { effectAttempted = true; await writes.shift()!() }
     while (notifications.length) { effectAttempted = true; await notifications.shift()!() }
   }
   const load = async () => {
-    await Promise.all([pomodoro.load(), timers.load(readStringList(api.settings.get().timerOrder) ?? []), alarms.load(readStringList(api.settings.get().alarmOrder) ?? [])])
+    await Promise.all([stopwatch.load(), pomodoro.load(), timers.load(readStringList(api.settings.get().timerOrder) ?? []), alarms.load(readStringList(api.settings.get().alarmOrder) ?? [])])
     await flush()
   }
   const ready = (async () => {
@@ -84,10 +88,12 @@ export function createClockOwner(api: PluginBackendApi) {
       effectAttempted = false
       try { return await operation() } catch (error) {
         const uncertain = effectAttempted
+        if (!uncertain && writes.length === 0 && notifications.length === 0) throw error
+        stopwatchRevision++
         operationApi = api
         modelApi = rootModelApi
         writes = []; notifications = []
-        ;({ timers, alarms, pomodoro } = models())
+        ;({ timers, alarms, pomodoro, stopwatch } = models())
         try { await load(); publish() } catch (recoveryError) {
           api.rpc.emit('clock.error', { message: recoveryError instanceof Error ? recoveryError.message : String(recoveryError) })
         }
@@ -97,13 +103,19 @@ export function createClockOwner(api: PluginBackendApi) {
     pending = next
     return next
   }
-  const mutate = (request: ClockMutation, originReceipt?: string, scoped: OperationApi = api) => serialize(async () => {
+  const mutate = (request: ClockMutation, originReceipt?: string, scoped: OperationApi = api, cancellation?: AbortSignal) => serialize(async () => {
+    cancellation?.throwIfAborted()
+    if (request.method.startsWith('stopwatch.') && (request.expectedSession !== session || !Number.isSafeInteger(request.expectedRevision) || request.expectedRevision !== stopwatchRevision)) throw Object.assign(new Error('Stopwatch changed; read its current state before editing.'), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
     operationApi = scoped
     modelApi = { data: scoped.data, settings: scoped.settings, notifications: queuedNotifications }
     const args = Array.isArray(request.args) ? request.args : []
     const itemId = identifier(args[0])
     let value: unknown
     switch (request.method) {
+      case 'stopwatch.start': stopwatch.start(); value = true; break
+      case 'stopwatch.stop': stopwatch.stop(); value = true; break
+      case 'stopwatch.lap': if (!stopwatch.state.running) throw new Error('Start the stopwatch before recording a lap.'); stopwatch.lap(); value = true; break
+      case 'stopwatch.reset': stopwatch.reset(); value = true; break
       case 'timer.add': {
         const seconds = args[1]
         if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0 || seconds > maximumSeconds) throw new Error('Timer duration must be between one second and 999:59:59.')
@@ -173,7 +185,9 @@ export function createClockOwner(api: PluginBackendApi) {
       }
       default: throw new Error('Unknown Clock action.')
     }
+    cancellation?.throwIfAborted()
     await flush()
+    if (request.method.startsWith('stopwatch.')) stopwatchRevision++
     publish()
     return { value: structuredClone(value), snapshot: snapshot() }
   })
@@ -207,5 +221,5 @@ export function createClockOwner(api: PluginBackendApi) {
       await flush(); publish()
     }).catch(error => api.rpc.emit('clock.error', { message: error instanceof Error ? error.message : String(error) }))
   })
-  return { ready, snapshot: async () => { await ready; await pending.catch(() => {}); return snapshot() }, mutate, dispose: async () => { active = false; offOccurrence(); offAction(); await pending.catch(() => {}); timers.suspend(); alarms.suspend(); pomodoro.suspend() } }
+  return { ready, snapshot: async () => { await ready; await pending.catch(() => {}); return snapshot() }, mutate, dispose: async () => { active = false; offOccurrence(); offAction(); await pending.catch(() => {}); timers.suspend(); alarms.suspend(); pomodoro.suspend(); stopwatch.suspend() } }
 }

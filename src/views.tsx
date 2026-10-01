@@ -880,8 +880,8 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
       h(
         'div',
         { className: 'clock-btn-row clock-btn-row--fill' },
-        btn(running ? uiText('auto.e3abd1b61219') : uiText('auto.44c57abd888a'), running ? store.swLap : store.swReset, 'secondary'),
-        btn(running ? uiText('auto.9e253470c876') : uiText('auto.952f375412e8'), running ? store.swStop : store.swStart, 'primary')
+        btn(running ? uiText('auto.e3abd1b61219') : uiText('auto.44c57abd888a'), running ? store.swLap : store.swReset, 'secondary', !store.swReady()),
+        btn(running ? uiText('auto.9e253470c876') : uiText('auto.952f375412e8'), running ? store.swStop : store.swStart, 'primary', !store.swReady())
       ),
       store.state.sw.laps.length > 0 &&
         h(

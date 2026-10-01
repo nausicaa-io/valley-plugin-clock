@@ -37,6 +37,8 @@ interface ClockTimerLike {
   running: boolean
 }
 interface ClockStoreLike {
+  ready: Promise<void>
+  flush(): Promise<void>
   state: { worldCities: string[]; timers: ClockTimerLike[] }
   worldAdd(q: string): unknown
   worldMove(from: number, to: number): boolean
@@ -583,23 +585,24 @@ describe('clock plugin', () => {
     })
   })
 
-  it('measures the stopwatch from wall-clock timestamps, not a tick count', () => {
+  it('measures the stopwatch from wall-clock timestamps, not a tick count', async () => {
     const { api } = mountRegister()
     const store = getStore(api)
+    await store.ready
     const now = vi.spyOn(Date, 'now')
     try {
       // Not one render, tick or frame happens between start and read — the
       // elapsed time is derived from the two timestamps alone.
       now.mockReturnValue(1_000_000)
-      store.swStart()
+      store.swStart(); await store.flush()
       now.mockReturnValue(1_060_000)
       expect(fmtStopwatch(store.swElapsed())).toBe('01:00.00')
       // Paused time is banked, and the wall clock moving on cannot add to it.
-      store.swStop()
+      store.swStop(); await store.flush()
       now.mockReturnValue(9_000_000)
       expect(fmtStopwatch(store.swElapsed())).toBe('01:00.00')
       // Resuming measures from the new start and adds to what was banked.
-      store.swStart()
+      store.swStart(); await store.flush()
       now.mockReturnValue(9_030_000)
       expect(fmtStopwatch(store.swElapsed())).toBe('01:30.00')
     } finally {

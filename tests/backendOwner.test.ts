@@ -7,6 +7,58 @@ import { register, type ClockStore } from '../src/index'
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('background Clock owner', () => {
+  it('retains running stopwatch time and laps across owner restart using the same saved format', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const h = createMockValleyApi({ manifest: { id: 'clock' } })
+    const owner = h.clockOwner()
+    const initial = await owner.snapshot()
+    await owner.mutate({ method: 'stopwatch.start', args: [], expectedSession: initial.session, expectedRevision: initial.stopwatch.revision })
+    vi.setSystemTime(1_030_000)
+    const running = await owner.snapshot()
+    await owner.mutate({ method: 'stopwatch.lap', args: [], expectedSession: running.session, expectedRevision: running.stopwatch.revision })
+    await owner.dispose()
+    vi.setSystemTime(1_060_000)
+    const restored = createClockOwner(h.backendApi)
+    const state = await restored.snapshot()
+    expect(state.stopwatch.state).toEqual({ running: true, startedAt: 1_000_000, elapsed: 0, laps: [30_000] })
+    await expect(restored.mutate({ method: 'stopwatch.reset', args: [], expectedSession: running.session, expectedRevision: running.stopwatch.revision })).rejects.toMatchObject({ code: 'REVISION_CONFLICT' })
+    await restored.mutate({ method: 'stopwatch.stop', args: [], expectedSession: state.session, expectedRevision: state.stopwatch.revision })
+    expect(await readClockFile(h.api, 'stopwatch.json')).toEqual({ running: false, startedAt: 0, elapsed: 60_000, laps: [30_000] })
+    await restored.dispose()
+  })
+
+  it('admits one concurrent stopwatch writer and rejects cancellation before persistence', async () => {
+    const h = createMockValleyApi({ manifest: { id: 'clock' } })
+    const owner = h.clockOwner(), state = await owner.snapshot()
+    const request = { method: 'stopwatch.start', args: [], expectedSession: state.session, expectedRevision: state.stopwatch.revision }
+    const writes = await Promise.allSettled(Array.from({ length: 10 }, () => owner.mutate(request)))
+    expect(writes.filter(value => value.status === 'fulfilled')).toHaveLength(1)
+    expect(writes.filter(value => value.status === 'rejected')).toHaveLength(9)
+    const running = await owner.snapshot(), cancellation = new AbortController()
+    cancellation.abort()
+    await expect(owner.mutate({ method: 'stopwatch.reset', args: [], expectedSession: running.session, expectedRevision: running.stopwatch.revision }, undefined, h.backendApi, cancellation.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    expect((await owner.snapshot()).stopwatch).toEqual(running.stopwatch)
+    await owner.dispose()
+  })
+
+  it('shares stopwatch controls with the UI while continuing after that surface closes', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const h = createMockValleyApi({ manifest: { id: 'clock' } }), off = register(h.api)
+    const store = h.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('Missing store') })
+    await store.ready
+    store.swStart(); await store.flush()
+    expect((await h.clockOwner().snapshot()).stopwatch.state.running).toBe(true)
+    off()
+    vi.setSystemTime(1_020_000)
+    const state = await h.clockOwner().snapshot()
+    await h.clockOwner().mutate({ method: 'stopwatch.stop', args: [], expectedSession: state.session, expectedRevision: state.stopwatch.revision })
+    expect((await h.clockOwner().snapshot()).stopwatch.state.elapsed).toBe(20_000)
+    const stop = store.listen(h.api)
+    await store.ready
+    expect(store.state.sw).toMatchObject({ elapsed: 20_000, running: false })
+    stop(); await h.clockOwner().dispose()
+  })
+
   it('finishes timers without a renderer and emits once with persisted causation across reload', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000_000)

@@ -7,6 +7,21 @@ export function registerClockWorkflow(api: PluginBackendApi): () => Promise<void
   const owner = createClockOwner(api)
   const offs = [
     api.rpc.handle('clock.snapshot', () => owner.snapshot()),
+    api.rpc.handleOperation('command.clock.snapshot', (_input, context) => { context.cancellation.throwIfAborted(); return owner.snapshot() }),
+    api.rpc.handleOperation('command.stopwatch.get', async (_input, context) => { context.cancellation.throwIfAborted(); const snapshot = await owner.snapshot(); const state = snapshot.stopwatch.state; return { session: snapshot.session, revision: snapshot.stopwatch.revision, state, elapsedMs: state.elapsed + (state.running ? Math.max(0, Date.now() - state.startedAt) : 0) } }),
+    api.rpc.handleOperation('command.clock.mutate', async (raw, context) => {
+      context.cancellation.throwIfAborted()
+      const { method, values } = raw as { method: string; values: Record<string, unknown> }
+      const parameters = values ?? {}
+      const args = method.endsWith('.move') ? [undefined, parameters.from, parameters.to]
+        : method === 'pomo.add' ? [undefined, parameters.name]
+        : method === 'pomo.rename' ? [parameters.id, parameters.name, parameters.override]
+        : method.endsWith('.update') ? [parameters.id, parameters.patch]
+        : [parameters.id]
+      const result = await owner.mutate({ method, args, ...(method.startsWith('stopwatch.') ? { expectedSession: parameters.expectedSession as string, expectedRevision: parameters.expectedRevision as number } : {}) }, await context.api.services.captureCausation(), context.api, context.cancellation)
+      if (result.value === false || result.value === null) throw Object.assign(new Error('This Clock item cannot perform the requested action.'), { code: 'ACTION_UNAVAILABLE', outcome: 'not-applied' })
+      return result
+    }),
     api.rpc.handle('clock.mutate', payload => owner.mutate(payload as ClockMutation))
   ]
   const contribution = registerWorkflowContribution(api, config.runtime.services[0].metadata.workflow as unknown as WorkflowContributionContract, async ({ nodeTypeId, parameters }, context) => {
