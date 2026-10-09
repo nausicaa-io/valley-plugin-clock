@@ -7,6 +7,9 @@ export interface PomoConfig { work: number; short: number; long: number; cycles:
 export interface PomodoroProfile extends PomoConfig { id: string; name: string }
 export interface PomoState { phase: PomoPhase; cycle: number; running: boolean; endsAt: number; remaining: number }
 
+export const samePomoState = (a: PomoState, b: PomoState): boolean =>
+  a.phase === b.phase && a.cycle === b.cycle && a.running === b.running && a.endsAt === b.endsAt && a.remaining === b.remaining
+
 export function pomodoroNextPhase(phase: PomoPhase, cycle: number, cyclesBeforeLong: number): { phase: PomoPhase; cycle: number } {
   if (phase === 'work') {
     const next = cycle + 1
@@ -239,6 +242,15 @@ export function createPomodoro(ports: PomodoroPorts) {
       ports.notify()
     },
     reset(): void { reset(); ports.notify() },
+    restore(expected: PomoState, next: PomoState): boolean {
+      if (!samePomoState(state, expected)) return false
+      touch()
+      state = { phase: next.phase, cycle: next.cycle, running: next.running, endsAt: next.endsAt, remaining: next.remaining }
+      if (state.running) { stopSound(); schedule() } else cancel()
+      persist()
+      ports.notify()
+      return true
+    },
     skip(): void {
       touch()
       stopSound()

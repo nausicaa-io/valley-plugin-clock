@@ -1,6 +1,6 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
 import { createStopwatch, type SwState } from '../stopwatch'
-import { createTimers, fmtCountdown, type ClockTimer } from '../timers'
+import { createTimers, fmtCountdown, type ClockTimer, type TimerRunState } from '../timers'
 import { createAlarms, type ClockAlarm } from '../alarms'
 import { readStringList } from '../preferences'
 import { isSoundId } from '../soundLibrary'
@@ -28,6 +28,46 @@ const identifier = (value: unknown): string | undefined => {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || !value || value.length > 200 || /[\x00-\x1f]/.test(value)) throw new Error('Invalid Clock item id.')
   return value
+}
+
+const timerRunState = (value: unknown): TimerRunState => {
+  const record = value as Partial<TimerRunState> | null
+  const time = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
+  if (!record || typeof record !== 'object' || typeof record.running !== 'boolean' || !time(record.endsAt) || !time(record.remaining) || (record.originReceipt !== undefined && typeof record.originReceipt !== 'string')) throw new Error('Invalid timer state.')
+  return { running: record.running, endsAt: record.endsAt!, remaining: record.remaining!, ...(record.originReceipt === undefined ? {} : { originReceipt: record.originReceipt }) }
+}
+
+const timerRecord = (value: unknown): ClockTimer => {
+  const record = value as Partial<ClockTimer> | null
+  if (!record || typeof record !== 'object' || typeof record.id !== 'string' || typeof record.label !== 'string' || typeof record.duration !== 'number' || !Number.isFinite(record.duration)) throw new Error('Invalid timer.')
+  return { id: record.id, label: record.label, duration: record.duration, ...timerRunState(record) }
+}
+
+const pomoState = (value: unknown): PomoState => {
+  const record = value as Partial<PomoState> | null
+  const time = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
+  if (!record || typeof record !== 'object' || !['work', 'short', 'long'].includes(record.phase as string) || !Number.isSafeInteger(record.cycle) || (record.cycle as number) < 0 || typeof record.running !== 'boolean' || !time(record.endsAt) || !time(record.remaining)) throw new Error('Invalid Pomodoro state.')
+  return { phase: record.phase as PomoState['phase'], cycle: record.cycle as number, running: record.running, endsAt: record.endsAt as number, remaining: record.remaining as number }
+}
+
+const alarmKeys = ['id', 'hour', 'minute', 'label', 'days', 'date', 'sound', 'enabled', 'originReceipt', 'snoozedUntil'] as const
+const alarmRecord = (value: unknown): ClockAlarm | null => {
+  if (value === null) return null
+  const record = value as Partial<ClockAlarm>
+  const optional = (n: unknown, valid: (n: unknown) => boolean) => n === undefined || valid(n)
+  if (!record || typeof record !== 'object' || typeof identifier(record.id) !== 'string' || !Number.isInteger(record.hour) || (record.hour as number) < 0 || (record.hour as number) > 23 || !Number.isInteger(record.minute) || (record.minute as number) < 0 || (record.minute as number) > 59
+    || typeof record.label !== 'string' || !Array.isArray(record.days) || record.days.some(day => !Number.isInteger(day) || day < 0 || day > 6) || !isSoundId(record.sound) || typeof record.enabled !== 'boolean'
+    || !optional(record.date, n => typeof n === 'string') || !optional(record.originReceipt, n => typeof n === 'string') || !optional(record.snoozedUntil, n => typeof n === 'number' && Number.isFinite(n))) throw new Error('Invalid alarm.')
+  // Keep the saved key order so a restored record serializes to the same bytes.
+  return Object.fromEntries(Object.keys(record).filter(key => (alarmKeys as readonly string[]).includes(key)).map(key => [key, key === 'days' ? [...record.days!] : record[key as keyof ClockAlarm]])) as unknown as ClockAlarm
+}
+const conflict = (subject: string) => Object.assign(new Error(`${subject} changed; read its current state before editing.`), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
+
+const stopwatchState = (value: unknown): SwState => {
+  const record = value as Partial<SwState> | null
+  const time = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
+  if (!record || typeof record !== 'object' || typeof record.running !== 'boolean' || !time(record.startedAt) || !time(record.elapsed) || !Array.isArray(record.laps) || !record.laps.every(time) || record.running !== (record.startedAt as number) > 0) throw new Error('Invalid stopwatch state.')
+  return { running: record.running, startedAt: record.startedAt as number, elapsed: record.elapsed as number, laps: [...record.laps] as number[] }
 }
 
 export function createClockOwner(api: PluginBackendApi) {
@@ -62,6 +102,11 @@ export function createClockOwner(api: PluginBackendApi) {
   let { timers, alarms, pomodoro, stopwatch } = models()
   const snapshot = (): ClockSnapshot => structuredClone({ session, revision, timers: timers.items, alarms: alarms.items, ringing: alarms.ringing, stopwatch: { revision: stopwatchRevision, state: stopwatch.state }, pomo: { state: pomodoro.state, profiles: pomodoro.profiles, profileId: pomodoro.profileId, config: pomodoro.config() } })
   const publish = () => { revision++; operationApi.rpc.emit('clock.state', snapshot()) }
+  const hostRing = async (request: () => Promise<boolean>) => {
+    effectAttempted = true
+    effectAttempted = await request()
+    return effectAttempted
+  }
   const flush = async () => {
     while (writes.length) { effectAttempted = true; await writes.shift()!() }
     while (notifications.length) { effectAttempted = true; await notifications.shift()!() }
@@ -116,6 +161,7 @@ export function createClockOwner(api: PluginBackendApi) {
       case 'stopwatch.stop': stopwatch.stop(); value = true; break
       case 'stopwatch.lap': if (!stopwatch.state.running) throw new Error('Start the stopwatch before recording a lap.'); stopwatch.lap(); value = true; break
       case 'stopwatch.reset': stopwatch.reset(); value = true; break
+      case 'stopwatch.restore': stopwatch.restore(stopwatchState(args[1])); value = true; break
       case 'timer.add': {
         const seconds = args[1]
         if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0 || seconds > maximumSeconds) throw new Error('Timer duration must be between one second and 999:59:59.')
@@ -129,8 +175,23 @@ export function createClockOwner(api: PluginBackendApi) {
         if (timer && !timer.running && timer.remaining > 0 && originReceipt) timer.originReceipt = originReceipt
         value = timers.resume(itemId); break
       }
+      case 'timer.restore': {
+        if (!itemId || !timers.restore(itemId, timerRunState(args[1]), timerRunState(args[2]))) throw Object.assign(new Error('Timer changed; read its current state before editing.'), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
+        value = true
+        break
+      }
+      case 'timer.discard': {
+        const expected = timerRecord(args[1])
+        if (!itemId || expected.id !== itemId || !timers.discard(itemId, expected)) throw conflict('Timer')
+        value = true
+        break
+      }
       case 'timer.cancel': value = timers.cancel(itemId); break
-      case 'timer.stop': timers.stop(itemId ?? ''); value = true; break
+      case 'timer.stop': {
+        value = timers.items.some(timer => timer.id === itemId) && await hostRing(() => scoped.notifications.stopRing(`timer:${itemId}`))
+        if (value) timers.stop(itemId ?? '')
+        break
+      }
       case 'timer.update': {
         const patch = args[1] as { label?: unknown; duration?: unknown }
         if (!patch || typeof patch !== 'object') throw new Error('Expected timer values.')
@@ -158,6 +219,15 @@ export function createClockOwner(api: PluginBackendApi) {
         break
       }
       case 'alarm.remove': value = alarms.remove(itemId ?? ''); break
+      case 'alarm.restore': {
+        const expected = alarmRecord(args[1])
+        const next = alarmRecord(args[2])
+        const index = args[3] === undefined ? undefined : Number(args[3])
+        if (index !== undefined && (!Number.isSafeInteger(index) || index < 0)) throw new Error('Invalid alarm position.')
+        if (!itemId || (!expected && !next) || (expected && expected.id !== itemId) || (next && next.id !== itemId) || !alarms.restore(itemId, expected, next, index)) throw conflict('Alarm')
+        value = true
+        break
+      }
       case 'alarm.toggle': {
         if (args[1] !== undefined && typeof args[1] !== 'boolean') throw new Error('Expected an alarm enabled flag.')
         const alarm = alarms.items.find(item => item.id === itemId)
@@ -166,13 +236,22 @@ export function createClockOwner(api: PluginBackendApi) {
         else { alarms.toggle(alarm.id, args[1] as boolean | undefined); value = { ...alarm } }
         break
       }
-      case 'alarm.dismiss': alarms.dismiss(itemId ?? ''); value = true; break
-      case 'alarm.snooze': alarms.snooze(itemId ?? ''); value = true; break
+      case 'alarm.dismiss': {
+        value = alarms.items.some(alarm => alarm.id === itemId) && (await hostRing(() => scoped.notifications.stopRing(`alarm:${itemId}`)) || alarms.ringing.includes(itemId ?? ''))
+        if (value) alarms.action(itemId ?? '', 'stop')
+        break
+      }
+      case 'alarm.snooze': {
+        value = alarms.items.some(alarm => alarm.id === itemId) && await hostRing(() => scoped.notifications.snooze(`alarm:${itemId}`, alarms.snoozeMinutes()))
+        if (value) alarms.action(itemId ?? '', 'snooze')
+        break
+      }
       case 'alarm.move': value = alarms.move(Number(args[1]), Number(args[2])); break
       case 'pomo.start': pomodoro.start(); break
       case 'pomo.pause': pomodoro.pause(); break
       case 'pomo.reset': pomodoro.reset(); break
       case 'pomo.skip': pomodoro.skip(); break
+      case 'pomo.restore': if (!pomodoro.restore(pomoState(args[1]), pomoState(args[2]))) throw conflict('Pomodoro'); value = true; break
       case 'pomo.select': pomodoro.selectProfile(itemId ?? ''); break
       case 'pomo.add': value = pomodoro.addProfile(label(args[1]), itemId); break
       case 'pomo.rename': pomodoro.renameProfile(itemId ?? '', label(args[1]), args[2] === true); break

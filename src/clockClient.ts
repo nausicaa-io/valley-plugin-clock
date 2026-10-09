@@ -1,10 +1,10 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
-import type { ClockTimer } from './timers'
-import type { ClockAlarm } from './alarms'
+import { sameRunState, sameTimer, type ClockTimer, type TimerRunState } from './timers'
+import { sameAlarm, type ClockAlarm } from './alarms'
 import { isSoundId, type AlarmSoundId } from './soundLibrary'
 import type { SwState } from './stopwatch'
 import type { ClockSnapshot } from './backend/clockOwner'
-import type { PomoConfig, PomodoroProfile } from './pomodoro'
+import { samePomoState, type PomoConfig, type PomoState, type PomodoroProfile } from './pomodoro'
 
 interface ClockClientPorts {
   api(): ValleyPluginApi
@@ -74,11 +74,11 @@ export function createClockClient(ports: ClockClientPorts) {
     })
   }
   const stopwatchElapsed = (): number => current.stopwatch.state.elapsed + (current.stopwatch.state.running ? Math.max(0, Date.now() - current.stopwatch.state.startedAt) : 0)
-  const changeStopwatch = (method: string, next: SwState): void => {
+  const changeStopwatch = (method: string, next: SwState, args: unknown[] = []): void => {
     if (!current.session) return
     const guard = { expectedSession: current.session, expectedRevision: current.stopwatch.revision }
     const stopwatch = { state: structuredClone(next), revision: guard.expectedRevision + 1 }
-    send(method, [], state => { state.stopwatch = structuredClone(stopwatch) }, guard)
+    send(method, args, state => { state.stopwatch = structuredClone(stopwatch) }, guard)
   }
   const timer = (id?: string) => id ? current.timers.find(value => value.id === id) : current.timers.at(-1)
   const alarm = (id: string) => current.alarms.find(value => value.id === id)
@@ -99,6 +99,7 @@ export function createClockClient(ports: ClockClientPorts) {
     return isSoundId(value) ? value : 'beep'
   }
   const suspend = () => { stopSounds() }
+  const conflict = (subject: string) => Object.assign(new Error(`${subject} changed; read its current state before editing.`), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
   return {
     refresh,
     reset: () => { generation++; overlays.clear(); refreshPending = undefined; stopSounds() },
@@ -120,7 +121,12 @@ export function createClockClient(ports: ClockClientPorts) {
       start: () => { if (!current.stopwatch.state.running) changeStopwatch('stopwatch.start', { ...current.stopwatch.state, running: true, startedAt: Date.now() }) },
       stop: () => { if (current.stopwatch.state.running) changeStopwatch('stopwatch.stop', { ...current.stopwatch.state, running: false, elapsed: stopwatchElapsed(), startedAt: 0 }) },
       lap: () => { if (current.stopwatch.state.running) changeStopwatch('stopwatch.lap', { ...current.stopwatch.state, laps: [stopwatchElapsed(), ...current.stopwatch.state.laps] }) },
-      reset: () => changeStopwatch('stopwatch.reset', { running: false, startedAt: 0, elapsed: 0, laps: [] })
+      reset: () => changeStopwatch('stopwatch.reset', { running: false, startedAt: 0, elapsed: 0, laps: [] }),
+      revision: () => current.stopwatch.revision,
+      restore: (next: SwState, expectedRevision: number) => {
+        if (!current.session || current.stopwatch.revision !== expectedRevision) throw Object.assign(new Error('Stopwatch changed; read its current state before editing.'), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
+        changeStopwatch('stopwatch.restore', next, [undefined, structuredClone(next)])
+      }
     },
     pomodoro: {
       get state() { return current.pomo.state },
@@ -129,6 +135,11 @@ export function createClockClient(ports: ClockClientPorts) {
       config: () => current.pomo.config,
       remaining: () => current.pomo.state.running ? Math.max(0, current.pomo.state.endsAt - Date.now()) : current.pomo.state.remaining,
       load: refresh, resumeLoading: refresh, suspend, ring: () => {},
+      ready: () => Boolean(current.session),
+      restore: (expected: PomoState, next: PomoState) => {
+        if (!current.session || !samePomoState(current.pomo.state, expected)) throw conflict('Pomodoro')
+        send('pomo.restore', [undefined, structuredClone(expected), structuredClone(next)], state => { state.pomo.state = structuredClone(next) })
+      },
       start: () => send('pomo.start', [], () => {}), pause: () => send('pomo.pause', [], () => {}), reset: () => send('pomo.reset', [], () => {}), skip: () => send('pomo.skip', [], () => {}),
       selectProfile: (id: string) => send('pomo.select', [id], () => {}),
       addProfile: (name?: string): PomodoroProfile => { const profile = { id: ports.id(), name: name ?? '', ...current.pomo.config }; send('pomo.add', [profile.id, name], () => {}); return profile },
@@ -180,6 +191,25 @@ export function createClockClient(ports: ClockClientPorts) {
         send('timer.resume', [value.id], state => { const item = state.timers.find(item => item.id === value.id); if (item) Object.assign(item, { running: true, endsAt }) })
         return true
       },
+      restore: (id: string, expected: TimerRunState, next: TimerRunState) => {
+        const value = timer(id)
+        if (!current.session || !value || !sameRunState(value, expected)) throw Object.assign(new Error('Timer changed; read its current state before editing.'), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
+        if (!next.running) stopSound(timerSounds, id)
+        else stoppedTimers.delete(id)
+        send('timer.restore', [id, structuredClone(expected), structuredClone(next)], state => {
+          const item = state.timers.find(item => item.id === id)
+          if (!item) return
+          Object.assign(item, { running: next.running, endsAt: next.endsAt, remaining: next.remaining })
+          if (next.originReceipt === undefined) delete item.originReceipt
+          else item.originReceipt = next.originReceipt
+        })
+      },
+      discard: (id: string, expected: ClockTimer) => {
+        const value = timer(id)
+        if (!current.session || !value || !sameTimer(value, expected)) throw conflict('Timer')
+        stopSound(timerSounds, id)
+        send('timer.discard', [id, structuredClone(expected)], state => { state.timers = state.timers.filter(item => item.id !== id) })
+      },
       cancel: (id?: string) => {
         const value = timer(id)
         if (!value) return false
@@ -225,6 +255,18 @@ export function createClockClient(ports: ClockClientPorts) {
         stopSound(alarmSounds, id)
         send('alarm.remove', [id], state => { state.alarms = state.alarms.filter(item => item.id !== id); state.ringing = state.ringing.filter(item => item !== id) })
         return value
+      },
+      restore: (id: string, expected: ClockAlarm | null, next: ClockAlarm | null, index?: number) => {
+        const value = alarm(id)
+        if (!current.session || (expected ? !value || !sameAlarm(value, expected) : value) || (!expected && !next)) throw conflict('Alarm')
+        stopSound(alarmSounds, id)
+        send('alarm.restore', [id, structuredClone(expected), structuredClone(next), ...(index === undefined ? [] : [index])], state => {
+          state.ringing = state.ringing.filter(item => item !== id)
+          if (!next) { state.alarms = state.alarms.filter(item => item.id !== id); return }
+          const at = state.alarms.findIndex(item => item.id === id)
+          if (at >= 0) state.alarms[at] = structuredClone(next)
+          else state.alarms.splice(Math.min(index ?? state.alarms.length, state.alarms.length), 0, structuredClone(next))
+        })
       },
       move: (from: number, to: number) => reorder('alarms', from, to),
       toggle: (id: string, on?: boolean) => {

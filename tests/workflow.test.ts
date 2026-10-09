@@ -8,7 +8,7 @@ import type { ClockSnapshot } from '../src/backend/clockOwner'
 
 afterEach(() => { vi.restoreAllMocks() })
 
-const outputSchemas = new Map(config.runtime.services.flatMap(service => 'commands' in service.metadata ? (service.metadata.commands ?? []).map(command => [command.id, new Ajv({ strict: false, strictSchema: true, allErrors: true, validateFormats: false, allowUnionTypes: true, ownProperties: true }).compile(command.outputSchema)] as const) : 'command' in service.metadata ? [[service.metadata.command.id, new Ajv({ strict: false, strictSchema: true, allErrors: true, validateFormats: false, allowUnionTypes: true, ownProperties: true }).compile(service.metadata.command.outputSchema)] as const] : []))
+const outputSchemas = new Map(config.runtime.services.flatMap(service => service.metadata && 'commands' in service.metadata ? (service.metadata.commands ?? []).map(command => [command.id, new Ajv({ strict: false, strictSchema: true, allErrors: true, validateFormats: false, allowUnionTypes: true, ownProperties: true }).compile(command.outputSchema)] as const) : service.metadata && 'command' in service.metadata ? [[service.metadata.command.id, new Ajv({ strict: false, strictSchema: true, allErrors: true, validateFormats: false, allowUnionTypes: true, ownProperties: true }).compile(service.metadata.command.outputSchema)] as const] : []))
 
 function setup() {
   const mock = createMockValleyApi({ manifest: { id: 'clock' } })
@@ -18,8 +18,14 @@ function setup() {
   api.rpc.handleOperation = (method, handler) => { handlers.set(method, async (input, context) => { const result = await handler(input, context!); const value = input as { nodeTypeId?: string; method?: string }; const id = method === 'command.clock.snapshot' ? 'snapshot' : method === 'command.stopwatch.get' ? 'stopwatch.get' : value.nodeTypeId ?? value.method!; const validate = outputSchemas.get(id)!; expect(validate(result), id + ': ' + JSON.stringify(validate.errors)).toBe(true); return result }); return () => { handlers.delete(method) } }
   const captureCausation = vi.fn(async () => 'workflow-origin')
   const context = { id: 'clock-action', cancellation: new AbortController().signal, api: { ...api, services: { ...api.services, captureCausation } } } as unknown as PluginBackendOperationContext
+  const schemas = new Map<string, ReturnType<Ajv['compile']>>()
+  api.schema = {
+    compile: async ({ schema }) => { const handle = crypto.randomUUID(); schemas.set(handle, new Ajv({ strict: false, validateFormats: false, allowUnionTypes: true }).compile(schema)); return { handle, digest: handle } },
+    validate: async (request) => { const validate = schemas.get(request.handle)!; return { valid: Boolean(validate('value' in request ? request.value : undefined)), issues: [] } },
+    release: async (handle) => { schemas.delete(handle) }
+  }
   const off = registerClockWorkflow(api)
-  const execute = (nodeTypeId: string, parameters: Record<string, unknown> = {}) => handlers.get('workflow.execute')!({ nodeTypeId, parameters, items: [{ json: {} }] }, context) as Promise<WorkflowExecutionResult>
+  const execute = async (nodeTypeId: string, parameters: Record<string, unknown> = {}) => { await vi.waitFor(() => expect(handlers.has('workflow.execute')).toBe(true)); return handlers.get('workflow.execute')!({ nodeTypeId, parameters, items: [{ json: {} }] }, context) as Promise<WorkflowExecutionResult> }
   const snapshot = () => handlers.get('clock.snapshot')!(undefined) as Promise<ClockSnapshot>
   return { mock, handlers, off, execute, snapshot, captureCausation, context }
 }
@@ -108,11 +114,35 @@ describe('Clock workflow contribution', () => {
 
   it('rejects invalid values and missing records before returning success', async () => {
     const h = setup()
-    await expect(h.execute('timer.start', { seconds: 0 })).rejects.toThrow('duration')
+    await expect(h.execute('timer.start', { seconds: 0 })).rejects.toThrow('schema')
     await expect(h.execute('alarm.create', { hour: 8, minute: 0, date: '2026-02-30' })).rejects.toThrow('date')
     await expect(h.execute('timer.cancel', { id: 'missing' })).rejects.toThrow('cannot perform')
     await expect(h.execute('alarm.disable', { id: 'missing' })).rejects.toThrow('cannot perform')
     expect(await h.snapshot()).toMatchObject({ timers: [], alarms: [] })
     await h.off()
+  })
+
+  it('refuses to stop, dismiss or snooze unknown or silent items before changing Clock state', async () => {
+    const h = setup()
+    const stopRing = vi.spyOn(h.mock.backendApi.notifications, 'stopRing').mockResolvedValue(false)
+    const snooze = vi.spyOn(h.mock.backendApi.notifications, 'snooze').mockResolvedValue(false)
+    const mutate = (method: string, id: unknown) => h.handlers.get('command.clock.mutate')!({ method, values: { id } }, h.context) as Promise<{ value: unknown }>
+    try {
+      const timer = (await h.execute('timer.start', { seconds: 60 })).items[0].json
+      const alarm = (await h.execute('alarm.create', { hour: 8, minute: 0 })).items[0].json
+      const before = await h.snapshot(), saved = await h.mock.api.data.files.readText('alarms.jsonl')
+      for (const [method, id] of [['timer.stop', timer.id], ['timer.stop', 'missing'], ['alarm.dismiss', alarm.id], ['alarm.dismiss', 'missing'], ['alarm.snooze', alarm.id], ['alarm.snooze', 'missing']] as const) {
+        await expect(mutate(method, id), `${method} ${id}`).rejects.toMatchObject({ code: 'ACTION_UNAVAILABLE', outcome: 'not-applied', retryable: false })
+      }
+      const after = await h.snapshot()
+      expect([after.timers, after.alarms, after.ringing]).toEqual([before.timers, before.alarms, before.ringing])
+      expect(await h.mock.api.data.files.readText('alarms.jsonl')).toBe(saved)
+      expect(stopRing.mock.calls).toEqual([[`timer:${timer.id}`], [`alarm:${alarm.id}`]])
+      expect(snooze.mock.calls).toEqual([[`alarm:${alarm.id}`, 9]])
+      stopRing.mockResolvedValue(true); snooze.mockResolvedValue(true)
+      expect((await mutate('timer.stop', timer.id)).value).toBe(true)
+      expect((await mutate('alarm.snooze', alarm.id)).value).toBe(true)
+      expect((await h.snapshot()).alarms[0].snoozedUntil).toBeGreaterThan(Date.now())
+    } finally { await h.off() }
   })
 })

@@ -11,6 +11,16 @@ export interface ClockTimer {
   originReceipt?: string
 }
 
+export type TimerRunState = Pick<ClockTimer, 'running' | 'endsAt' | 'remaining' | 'originReceipt'>
+
+export const timerRunState = (timer: ClockTimer): TimerRunState => ({ running: timer.running, endsAt: timer.endsAt, remaining: timer.remaining, ...(timer.originReceipt === undefined ? {} : { originReceipt: timer.originReceipt }) })
+
+export const sameRunState = (timer: ClockTimer, state: TimerRunState): boolean =>
+  timer.running === state.running && timer.endsAt === state.endsAt && timer.remaining === state.remaining && timer.originReceipt === state.originReceipt
+
+export const sameTimer = (timer: ClockTimer, expected: ClockTimer): boolean =>
+  timer.id === expected.id && timer.label === expected.label && timer.duration === expected.duration && sameRunState(timer, expected)
+
 interface TimerPorts {
   api(): Pick<ValleyPluginApi, 'data'> & { settings: Pick<ValleyPluginApi['settings'], 'get' | 'set'> } & { notifications: Pick<ValleyPluginApi['notifications'], 'schedule' | 'cancel'> }
   enqueue(write: () => Promise<unknown>): void
@@ -155,9 +165,32 @@ export function createTimers(ports: TimerPorts) {
       changed()
       return true
     },
+    restore(id: string, expected: TimerRunState, next: TimerRunState): boolean {
+      const timer = find(id)
+      if (!timer || !sameRunState(timer, expected)) return false
+      timer.running = next.running
+      timer.endsAt = next.endsAt
+      timer.remaining = next.remaining
+      if (next.originReceipt === undefined) delete timer.originReceipt
+      else timer.originReceipt = next.originReceipt
+      if (timer.running) schedule(timer)
+      else { stop(timer.id); void ports.api().notifications.cancel(key(timer.id)) }
+      changed()
+      return true
+    },
     cancel(id?: string): boolean {
       const timer = find(id)
       if (!timer) return false
+      stopSound(timer.id)
+      stopped.delete(timer.id)
+      void ports.api().notifications.cancel(key(timer.id))
+      items = items.filter(entry => entry.id !== timer.id)
+      changed()
+      return true
+    },
+    discard(id: string, expected: ClockTimer): boolean {
+      const timer = find(id)
+      if (!timer || !sameTimer(timer, expected)) return false
       stopSound(timer.id)
       stopped.delete(timer.id)
       void ports.api().notifications.cancel(key(timer.id))

@@ -1,3 +1,4 @@
+import Ajv from 'ajv'
 import { readClockFile } from '../src/persistence'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
@@ -934,6 +935,75 @@ describe('clock plugin', () => {
 
 
 describe('clock surface restoration', () => {
+  it('validates every public result against its schema and observes persisted mutations and restoration', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'clock' }, settings: { worldCities: [] } })
+    const registrations = vi.spyOn(mock.api.commands, 'register')
+    const off = register(mock.api)
+    const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('missing store') })
+    const seen = new Set<string>()
+    try {
+      await store.ready
+      const commands = registrations.mock.calls.map(([command]) => command as typeof command & { outputSchema: Record<string, unknown> })
+      expect(commands).toHaveLength(23)
+      const ajv = new Ajv({ strict: false, strictSchema: true, allErrors: true })
+      const call = async (id: string, input?: unknown) => {
+        const command = commands.find(command => command.id === id)!
+        expect(command.input?.schema, id).toBeDefined()
+        const result = await mock.api.commands.execute(`clock:${id}`, input)
+        expect(result.ok, id).toBe(true)
+        if (!result.ok) throw new Error(JSON.stringify(result))
+        const validate = ajv.compile(command.outputSchema)
+        expect(validate(result.value), `${id}: ${JSON.stringify(validate.errors)}`).toBe(true)
+        expect(validate({ ...(result.value as Record<string, unknown>), unexpected: true }), id).toBe(false)
+        seen.add(id)
+        return result.value as Record<string, unknown>
+      }
+      const mode = store.state.mode
+      await call('mode', { mode: 'timer' })
+      expect(store.state.mode).toBe('timer')
+      await mock.busUndo.at(-1)!.undo()
+      expect(store.state.mode).toBe(mode)
+      await call('display', { surface: 'stopwatch', style: 'digital' })
+      expect(mock.api.settings.get().stopwatchDisplay).toBe('digital')
+      await mock.busUndo.at(-1)!.undo()
+      await call('sw-start')
+      await call('sw-lap')
+      await call('sw-stop')
+      expect((await readClockFile<Record<string, unknown>>(mock.api, 'stopwatch.json'))?.running).toBe(false)
+      await call('sw-reset')
+      const timer = await call('timer-start', { duration: '10m', label: 'Frühstück' })
+      await call('timer-pause', { id: timer.id })
+      expect((await readClockFile<Array<Record<string, unknown>>>(mock.api, 'timers.jsonl'))?.[0]).toMatchObject({ label: 'Frühstück', running: false })
+      await call('timer-resume', { id: timer.id })
+      await call('timer-list')
+      await call('timer-cancel', { id: timer.id })
+      expect(await readClockFile(mock.api, 'timers.jsonl')).toEqual([])
+      await call('world-add', { city: 'Tokyo' })
+      await call('world-add', { city: 'Bern' })
+      const cities = structuredClone(mock.api.settings.get().worldCities)
+      await call('world-move', { city: 'Bern', position: 1 })
+      expect(mock.api.settings.get().worldCities).not.toEqual(cities)
+      await mock.busUndo.at(-1)!.undo()
+      expect(mock.api.settings.get().worldCities).toEqual(cities)
+      await call('world-list')
+      await call('world-remove', { city: 'Tokyo' })
+      const alarm = await call('alarm-add', { time: '08:45', label: 'Größe', days: 'mon,tue' })
+      const alarmFile = await mock.api.data.files.readText('alarms.jsonl')
+      await call('alarm-toggle', { id: alarm.id })
+      expect(await mock.api.data.files.readText('alarms.jsonl')).not.toBe(alarmFile)
+      await mock.busUndo.at(-1)!.undo()
+      expect(await mock.api.data.files.readText('alarms.jsonl')).toBe(alarmFile)
+      await call('alarm-list')
+      await call('alarm-remove', { id: alarm.id })
+      expect(await readClockFile(mock.api, 'alarms.jsonl')).toEqual([])
+      await call('pomodoro-start')
+      await call('pomodoro-pause')
+      await call('pomodoro-skip')
+      await call('pomodoro-reset')
+      expect([...seen].sort()).toEqual(commands.map(command => command.id).sort())
+    } finally { off() }
+  })
+
   it('describes command inputs and parses CLI timer and alarm arguments before execution', async () => {
     const mock = createMockValleyApi({ manifest: { id: 'clock' } })
     const off = register(mock.api)
@@ -947,6 +1017,141 @@ describe('clock surface restoration', () => {
     const alarm = mock.commands.find((command) => command.id === 'alarm-add')!
     expect(alarm.input!.parse(alarm.input!.fromCli!(['08:45'], { days: 'mon,tue' }))).toMatchObject({ hour: 8, minute: 45, days: [1, 2] })
     off()
+  })
+
+  it('reports the Pomodoro phase that a skip saved', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'clock' } })
+    const off = register(mock.api)
+    const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('missing store') })
+    await store.ready
+    expect(store.state.pomo.phase).toBe('work')
+    expect(await mock.api.commands.execute('clock:pomodoro-skip')).toEqual({ ok: true, value: { phase: 'short' } })
+    expect(await readClockFile(mock.api, 'pomodoro.json')).toMatchObject({ phase: 'short', cycle: 1 })
+    off()
+  })
+
+  it('refuses stopwatch commands while the panel has no backend session', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'clock' } })
+    const call = mock.api.backend.call
+    mock.api.backend.call = vi.fn(async (method: string, payload?: unknown) => method === 'clock.snapshot' ? { ...await call<object>(method, payload), session: '' } : call(method, payload)) as typeof call
+    mock.api.backend.on = () => () => {}
+    const off = register(mock.api)
+    const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('missing store') })
+    await store.ready
+    const before = (await mock.clockOwner().snapshot()).stopwatch
+    for (const id of ['sw-start', 'sw-stop', 'sw-lap', 'sw-reset']) {
+      await expect(mock.commands.find((command) => command.id === id)!.run(undefined, { caller: 'agent' }), id).rejects.toMatchObject({ code: 'ACTION_UNAVAILABLE', outcome: 'not-applied', retryable: false })
+    }
+    expect((await mock.clockOwner().snapshot()).stopwatch).toEqual(before)
+    off()
+  })
+
+  it('refuses stopwatch commands that would not change it and undoes start and stop exactly', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'clock' } })
+    const off = register(mock.api)
+    const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('missing store') })
+    try {
+      await store.ready
+      const run = (id: string) => mock.commands.find((command) => command.id === id)!.run(undefined, { caller: 'agent' })
+      const execute = async (id: string) => expect((await mock.api.commands.execute(`clock:${id}`)).ok, id).toBe(true)
+      const unavailable = { code: 'ACTION_UNAVAILABLE', outcome: 'not-applied', retryable: false }
+      const file = () => mock.api.data.files.readText('stopwatch.json')
+      const tick = () => new Promise(resolve => setTimeout(resolve, 5))
+      await expect(run('sw-stop')).rejects.toMatchObject(unavailable)
+      await expect(run('sw-lap')).rejects.toMatchObject(unavailable)
+      expect(store.state.sw).toMatchObject({ running: false, laps: [] })
+
+      await execute('sw-start')
+      await tick()
+      await execute('sw-lap')
+      await execute('sw-stop')
+      const stopped = await file()
+      const undoCount = mock.busUndo.length
+      await expect(run('sw-stop')).rejects.toMatchObject(unavailable)
+      await expect(run('sw-lap')).rejects.toMatchObject(unavailable)
+      expect(await file()).toBe(stopped)
+
+      await execute('sw-start')
+      const running = await file()
+      await expect(run('sw-start')).rejects.toMatchObject(unavailable)
+      expect(await file()).toBe(running)
+      expect(mock.busUndo).toHaveLength(undoCount + 1)
+      await tick()
+      await mock.busUndo.at(-1)!.undo()
+      expect(await file()).toBe(stopped)
+      expect(store.state.sw.running).toBe(false)
+
+      await execute('sw-start')
+      const restarted = await file()
+      await execute('sw-stop')
+      await tick()
+      await mock.busUndo.at(-1)!.undo()
+      expect(await file()).toBe(restarted)
+      expect(store.state.sw.running).toBe(true)
+
+      await execute('sw-stop')
+      await execute('sw-reset')
+      const reset = await file()
+      await expect(mock.busUndo.at(-1)!.undo()).rejects.toMatchObject({ code: 'REVISION_CONFLICT' })
+      expect(await file()).toBe(reset)
+    } finally { off() }
+  })
+
+  it('refuses timer pause and resume that would not change it and undoes them exactly', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'clock' } })
+    const off = register(mock.api)
+    const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('missing store') })
+    try {
+      await store.ready
+      const run = (id: string, input?: unknown) => mock.commands.find((command) => command.id === id)!.run((input ?? {}) as never, { caller: 'agent' })
+      const execute = async (id: string, input?: unknown) => {
+        const result = await mock.api.commands.execute(`clock:${id}`, input)
+        expect(result.ok, `${id}: ${JSON.stringify(result)}`).toBe(true)
+        return result
+      }
+      const unavailable = { code: 'ACTION_UNAVAILABLE', outcome: 'not-applied', retryable: false }
+      const file = () => mock.api.data.files.readText('timers.jsonl').catch(() => null)
+      const tick = () => new Promise(resolve => setTimeout(resolve, 15))
+      await expect(run('timer-pause')).rejects.toMatchObject(unavailable)
+      await expect(run('timer-resume')).rejects.toMatchObject(unavailable)
+
+      const started = await execute('timer-start', { duration: '10m', label: 'Tea' })
+      const id = (started as { value: { id: string } }).value.id
+      const running = await file()
+      const undoCount = mock.busUndo.length
+      await expect(run('timer-resume', { id })).rejects.toMatchObject(unavailable)
+      await expect(run('timer-pause', { id: 'missing' })).rejects.toMatchObject(unavailable)
+      expect(await file()).toBe(running)
+      expect(mock.busUndo).toHaveLength(undoCount)
+
+      await tick()
+      await execute('timer-pause', { id })
+      const paused = await file()
+      expect(paused).not.toBe(running)
+      await expect(run('timer-pause', { id })).rejects.toMatchObject(unavailable)
+      expect(await file()).toBe(paused)
+      expect(mock.busUndo).toHaveLength(undoCount + 1)
+      await tick()
+      await mock.busUndo.at(-1)!.undo()
+      expect(await file()).toBe(running)
+      expect(store.state.timers[0].running).toBe(true)
+
+      await execute('timer-pause', { id })
+      const pausedAgain = await file()
+      await tick()
+      await execute('timer-resume')
+      await tick()
+      await mock.busUndo.at(-1)!.undo()
+      expect(await file()).toBe(pausedAgain)
+      expect(store.state.timers[0].running).toBe(false)
+
+      await execute('timer-resume', { id })
+      store.pauseTimer(id)
+      await store.flush()
+      const changed = await file()
+      await expect(mock.busUndo.at(-1)!.undo()).rejects.toMatchObject({ code: 'REVISION_CONFLICT' })
+      expect(await file()).toBe(changed)
+    } finally { off() }
   })
 
   it('restores the selected paused timer without restarting it or exposing Properties', async () => {

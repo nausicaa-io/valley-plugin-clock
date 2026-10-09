@@ -76,6 +76,10 @@ export function createStopwatch(ports: StopwatchPorts) {
       state.laps.unshift(elapsed())
       changed()
     },
+    restore(next: SwState): void {
+      state = { running: next.running, startedAt: next.startedAt, elapsed: next.elapsed, laps: [...next.laps] }
+      changed()
+    },
     reset(): void {
       state = { running: false, startedAt: 0, elapsed: 0, laps: [] }
       changed()

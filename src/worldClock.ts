@@ -1,5 +1,6 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { uiText } from './localization'
+import { readStringList } from './preferences'
 
 export function createFormatterCache(capacity = 256) {
   if (!Number.isInteger(capacity) || capacity < 1 || capacity > 256) throw new RangeError('Invalid formatter cache capacity')
@@ -256,15 +257,21 @@ interface WorldClockPorts {
 
 export function createWorldClock(ports: WorldClockPorts) {
   let items: string[] = []
-  const persist = (): void => {
+  const persist = (saved?: unknown): void => {
     const api = ports.api()
-    const value = JSON.stringify(items)
+    const value = saved ?? JSON.stringify(items)
     ports.enqueue(async () => { if (!(await api.settings.set('worldCities', value)).ok) throw ports.persistenceError() })
     ports.notify()
   }
   return {
     get items(): string[] { return items },
     restore(saved: readonly string[]): void { items = [...saved] },
+    replace(expected: readonly string[], next: readonly string[], raw?: unknown): void {
+      if (items.length !== expected.length || items.some((id, index) => id !== expected[index])) throw Object.assign(new Error('World clock changed; read its current list before editing.'), { code: 'REVISION_CONFLICT', outcome: 'not-applied' })
+      items = [...next]
+      const saved = readStringList(raw)
+      persist(saved && saved.length === items.length && saved.every((id, index) => id === items[index]) ? raw : undefined)
+    },
     add(query: string): City | null {
       const city = findCity(query)
       if (!city || items.includes(cityId(city))) return city

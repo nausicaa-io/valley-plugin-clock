@@ -23,6 +23,9 @@ export interface ClockAlarm {
   snoozedUntil?: number
 }
 
+const alarmFields = (alarm: ClockAlarm): string => JSON.stringify([alarm.id, alarm.hour, alarm.minute, alarm.label, alarm.days, alarm.date, alarm.sound, alarm.enabled, alarm.originReceipt, alarm.snoozedUntil])
+export const sameAlarm = (a: ClockAlarm, b: ClockAlarm): boolean => alarmFields(a) === alarmFields(b)
+
 /** Epoch ms of the next firing of `alarm` strictly after `now`, or `null` when
  *  it can never fire again (a disabled alarm, or a one-shot already past).
  *
@@ -183,6 +186,7 @@ export function createAlarms(ports: AlarmPorts) {
     get items(): ClockAlarm[] { return items },
     get ringing(): string[] { return ringing },
     defaultSound,
+    snoozeMinutes,
     stopSounds,
     load,
     resumeLoading(): Promise<void> { return reloadNeeded ? load(savedOrder) : Promise.resolve() },
@@ -221,6 +225,28 @@ export function createAlarms(ports: AlarmPorts) {
       ports.removed(id)
       changed()
       return alarm
+    },
+    restore(id: string, expected: ClockAlarm | null, next: ClockAlarm | null, index = items.length): boolean {
+      const at = items.findIndex(alarm => alarm.id === id)
+      if (expected ? at < 0 || !sameAlarm(items[at], expected) : at >= 0) return false
+      if (next && next.id !== id) return false
+      stop(id)
+      if (!next) {
+        cancel(id)
+        items = items.filter(alarm => alarm.id !== id)
+        ports.removed(id)
+      } else {
+        const alarm = structuredClone(next)
+        if (at >= 0) items = items.map(entry => entry.id === id ? alarm : entry)
+        else {
+          const position = Math.min(Math.max(0, Math.floor(index)), items.length)
+          items = [...items.slice(0, position), alarm, ...items.slice(position)]
+        }
+        armedAt.delete(id)
+        schedule(alarm)
+      }
+      changed()
+      return true
     },
     move(from: number, to: number): boolean {
       if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < 0 || from >= items.length || to >= items.length || from === to) return false

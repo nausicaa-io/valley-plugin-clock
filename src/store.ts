@@ -1,6 +1,6 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { uiText } from './localization'
-import type { ClockTimer } from './timers'
+import type { ClockTimer, TimerRunState } from './timers'
 import { createClockClient } from './clockClient'
 import type { SwState } from './stopwatch'
 import type { ClockAlarm } from './alarms'
@@ -73,15 +73,22 @@ export interface ClockStore {
   swLap(): void
   swReset(): void
   swElapsed(): number
+  swRevision(): number
+  swRestore(state: SwState, expectedRevision: number): void
   addTimer(seconds: number, label?: string): ClockTimer | null
   pauseTimer(id?: string): boolean
   resumeTimer(id?: string): boolean
+  restoreTimer(id: string, expected: TimerRunState, next: TimerRunState): void
   cancelTimer(id?: string): boolean
+  /** Undo a timer's creation: removes it only while it is still exactly `expected`. */
+  discardTimer(id: string, expected: ClockTimer): void
   timerRemaining(t: ClockTimer): number
   timerMove(from: number, to: number): boolean
   worldAdd(query: string): City | null
   worldRemove(tz: string): boolean
   worldMove(from: number, to: number): boolean
+  /** Replace the world list with `next` only while it is still `expected`; `raw` is the saved value to write back. */
+  worldRestore(expected: readonly string[], next: readonly string[], raw?: unknown): void
   /** Persist the tab strip's order after a drag. */
   setTabOrder(order: Mode[]): void
   soundOptions(): SoundOption[]
@@ -93,6 +100,8 @@ export interface ClockStore {
   removeAlarm(id: string): ClockAlarm | null
   alarmMove(from: number, to: number): boolean
   toggleAlarm(id: string, on?: boolean): boolean
+  /** Put one alarm back exactly (`next`, or absent when null) while it is still `expected`. */
+  restoreAlarm(id: string, expected: ClockAlarm | null, next: ClockAlarm | null, index?: number): void
   dismissAlarm(id: string): void
   snoozeAlarm(id: string): void
   setAlarmEditing(id: string | null): void
@@ -100,6 +109,8 @@ export interface ClockStore {
   pomoPause(): void
   pomoReset(): void
   pomoSkip(): void
+  pomoReady(): boolean
+  pomoRestore(expected: PomoState, next: PomoState): void
   pomoRemaining(): number
   /**
    * Attach to the host's notification stream — alarms, timers and Pomodoro all
@@ -232,15 +243,20 @@ function createStore(api: ValleyPluginApi): ClockStore {
     swLap: stopwatch.lap,
     swReset: stopwatch.reset,
     swElapsed: stopwatch.elapsed,
+    swRevision: stopwatch.revision,
+    swRestore: stopwatch.restore,
     addTimer: timers.add,
     pauseTimer: timers.pause,
     resumeTimer: timers.resume,
+    restoreTimer: timers.restore,
     cancelTimer: timers.cancel,
+    discardTimer: timers.discard,
     timerRemaining: timers.remaining,
     timerMove: timers.move,
     worldAdd: world.add,
     worldRemove: world.remove,
     worldMove: world.move,
+    worldRestore: world.replace,
     setTabOrder,
     soundOptions: () => sounds.map(option => ({ ...option, label: Object.hasOwn(SOUND_LABEL, option.value) ? SOUND_LABEL[option.value as keyof typeof SOUND_LABEL]() : option.label })),
     refreshSounds,
@@ -255,6 +271,10 @@ function createStore(api: ValleyPluginApi): ClockStore {
     },
     alarmMove: alarms.move,
     toggleAlarm: alarms.toggle,
+    restoreAlarm: (id, expected, next, index) => {
+      alarms.restore(id, expected, next, index)
+      if (!next && state.alarmEditing === id) { state.alarmEditing = null; notify() }
+    },
     dismissAlarm: alarms.dismiss,
     snoozeAlarm: alarms.snooze,
     setAlarmEditing: (id) => {
@@ -265,6 +285,8 @@ function createStore(api: ValleyPluginApi): ClockStore {
     pomoPause: pomodoro.pause,
     pomoReset: pomodoro.reset,
     pomoSkip: pomodoro.skip,
+    pomoReady: pomodoro.ready,
+    pomoRestore: pomodoro.restore,
     pomoRemaining: pomodoro.remaining,
     /**
      * Subscribe to the host's notification stream. Called once per `register`;
