@@ -18905,6 +18905,335 @@
         }
       },
       {
+        "id": "command.clock.occurrence.delete",
+        "version": "1.0.0",
+        "method": "command.clock.mutate",
+        "operation": true,
+        "request": {
+          "type": "unknown"
+        },
+        "response": {
+          "type": "unknown"
+        },
+        "metadata": {
+          "command": {
+            "id": "occurrence.delete",
+            "description": "Remove one delivered timer or alarm occurrence from the Clock occurrence history",
+            "effect": "write",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false,
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            },
+            "request": {
+              "constants": {
+                "method": "occurrence.delete"
+              },
+              "inputProperty": "values"
+            },
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "const": true
+                },
+                "snapshot": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "string"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "timers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "duration": {
+                            "type": "number"
+                          },
+                          "endsAt": {
+                            "type": "number"
+                          },
+                          "remaining": {
+                            "type": "number"
+                          },
+                          "running": {
+                            "type": "boolean"
+                          },
+                          "originReceipt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "duration",
+                          "endsAt",
+                          "remaining",
+                          "running"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "alarms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "hour": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 23
+                          },
+                          "minute": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 59
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "days": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 6
+                            }
+                          },
+                          "date": {
+                            "type": "string"
+                          },
+                          "sound": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "originReceipt": {
+                            "type": "string"
+                          },
+                          "snoozedUntil": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "hour",
+                          "minute",
+                          "label",
+                          "days",
+                          "sound",
+                          "enabled"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "ringing": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "pomo": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "object",
+                          "properties": {
+                            "phase": {
+                              "type": "string",
+                              "enum": [
+                                "work",
+                                "short",
+                                "long"
+                              ]
+                            },
+                            "cycle": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "running": {
+                              "type": "boolean"
+                            },
+                            "endsAt": {
+                              "type": "number"
+                            },
+                            "remaining": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "phase",
+                            "cycle",
+                            "running",
+                            "endsAt",
+                            "remaining"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "work": {
+                                "type": "number"
+                              },
+                              "short": {
+                                "type": "number"
+                              },
+                              "long": {
+                                "type": "number"
+                              },
+                              "cycles": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "work",
+                              "short",
+                              "long",
+                              "cycles"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "profileId": {
+                          "type": "string"
+                        },
+                        "config": {
+                          "type": "object",
+                          "properties": {
+                            "work": {
+                              "type": "number"
+                            },
+                            "short": {
+                              "type": "number"
+                            },
+                            "long": {
+                              "type": "number"
+                            },
+                            "cycles": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "work",
+                            "short",
+                            "long",
+                            "cycles"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "profiles",
+                        "profileId",
+                        "config"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "stopwatch": {
+                      "type": "object",
+                      "properties": {
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "state": {
+                          "type": "object",
+                          "properties": {
+                            "running": {
+                              "type": "boolean"
+                            },
+                            "startedAt": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "elapsed": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "laps": {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "minimum": 0
+                              }
+                            }
+                          },
+                          "required": [
+                            "running",
+                            "startedAt",
+                            "elapsed",
+                            "laps"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "revision",
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "revision",
+                    "timers",
+                    "alarms",
+                    "ringing",
+                    "pomo",
+                    "stopwatch"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "value",
+                "snapshot"
+              ],
+              "additionalProperties": false,
+              "$schema": "http://json-schema.org/draft-07/schema#"
+            }
+          }
+        }
+      },
+      {
         "id": "command.clock.pomo.select",
         "version": "1.0.0",
         "method": "command.clock.mutate",

@@ -145,4 +145,61 @@ describe('Clock workflow contribution', () => {
       expect((await h.snapshot()).alarms[0].snoozedUntil).toBeGreaterThan(Date.now())
     } finally { await h.off() }
   })
+
+  it('deletes one delivered occurrence from the ledger and the host exactly and refuses unknown ids or a changed ledger', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(1_000_000)
+    const h = setup()
+    const purgeOccurrence = vi.fn(async (_occurrenceId: string) => true)
+    Object.assign(h.mock.backendApi.notifications, { purgeOccurrence })
+    const remove = (id: unknown) => h.handlers.get('command.clock.mutate')!({ method: 'occurrence.delete', values: { id } }, h.context) as Promise<{ value: unknown }>
+    const ledger = () => h.mock.api.data.files.readText('workflow-occurrences.json')
+    const conflict = { code: 'REVISION_CONFLICT', outcome: 'not-applied' }
+    try {
+      const timers = [(await h.execute('timer.start', { seconds: 60 })).items[0].json, (await h.execute('timer.start', { seconds: 60 })).items[0].json]
+      vi.setSystemTime(1_120_000)
+      for (const [index, occurrenceId] of ['first', 'second'].entries()) { h.mock.emitOccurrence({ key: `timer:${timers[index].id}`, eventId: 'clock.timer', occurrenceId, scheduledAt: 1, firedAt: 1, missed: true }); await h.snapshot() }
+      expect(await ledger()).toBe('["first","second"]\n')
+      const before = await h.snapshot()
+      expect((await remove('second')).value).toBe(true)
+      expect(await ledger()).toBe('["first"]\n')
+      expect(purgeOccurrence.mock.calls).toEqual([['second']])
+      expect((await h.snapshot()).timers).toEqual(before.timers)
+      await expect(remove('second')).rejects.toMatchObject(conflict)
+      await expect(remove('missing')).rejects.toMatchObject(conflict)
+      expect(await ledger()).toBe('["first"]\n')
+      expect(purgeOccurrence).toHaveBeenCalledTimes(1)
+      const current = await h.mock.api.data.files.readTextBaseline('workflow-occurrences.json')
+      expect((await h.mock.api.data.files.writeTextGuarded('workflow-occurrences.json', '["first","other"]\n', current!.baseline)).ok).toBe(true)
+      await expect(remove('first')).rejects.toMatchObject(conflict)
+      expect(await ledger()).toBe('["first","other"]\n')
+      expect(purgeOccurrence).toHaveBeenCalledTimes(1)
+    } finally { await h.off(); vi.useRealTimers() }
+  })
+
+  it('keeps the ledger when the host refuses or lacks the occurrence purge and reports a failed purge as uncertain', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(1_000_000)
+    const h = setup()
+    const remove = (id: unknown) => h.handlers.get('command.clock.mutate')!({ method: 'occurrence.delete', values: { id } }, h.context) as Promise<{ value: unknown }>
+    const ledger = () => h.mock.api.data.files.readText('workflow-occurrences.json')
+    const notifications = h.mock.backendApi.notifications as typeof h.mock.backendApi.notifications & { purgeOccurrence?: (occurrenceId: string) => Promise<boolean> }
+    try {
+      const timer = (await h.execute('timer.start', { seconds: 60 })).items[0].json
+      vi.setSystemTime(1_120_000)
+      h.mock.emitOccurrence({ key: `timer:${timer.id}`, eventId: 'clock.timer', occurrenceId: 'first', scheduledAt: 1, firedAt: 1, missed: true }); await h.snapshot()
+      expect(await ledger()).toBe('["first"]\n')
+      delete notifications.purgeOccurrence
+      await expect(remove('first')).rejects.toMatchObject({ code: 'ACTION_UNAVAILABLE', outcome: 'not-applied', retryable: false })
+      const refused = vi.fn(async (_occurrenceId: string) => false)
+      notifications.purgeOccurrence = refused
+      await expect(remove('first')).rejects.toMatchObject({ code: 'REVISION_CONFLICT', outcome: 'not-applied' })
+      expect(refused.mock.calls).toEqual([['first']])
+      expect(await ledger()).toBe('["first"]\n')
+      notifications.purgeOccurrence = vi.fn(async () => { throw new Error('host gone') })
+      await expect(remove('first')).rejects.toMatchObject({ outcomeUnknown: true })
+      expect(await ledger()).toBe('["first"]\n')
+      notifications.purgeOccurrence = vi.fn(async () => true)
+      expect((await remove('first')).value).toBe(true)
+      expect(await ledger()).toBe('[]\n')
+    } finally { delete notifications.purgeOccurrence; await h.off(); vi.useRealTimers() }
+  })
 })

@@ -262,6 +262,22 @@ export function createClockOwner(api: PluginBackendApi) {
         if (!patch || typeof patch !== 'object' || Object.entries(patch).some(([key, value]) => !['work', 'short', 'long', 'cycles'].includes(key) || typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 1440)) throw new Error('Invalid Pomodoro duration.')
         pomodoro.updateProfile(itemId ?? '', patch); break
       }
+      case 'occurrence.delete': {
+        // The inverse of a delivered occurrence's ledger append (the occurrence handler below): rewrite the ledger without that id, guarded by the bytes this owner wrote.
+        const ledger = await scoped.data.files.readTextBaseline('workflow-occurrences.json')
+        if (!itemId || !seen.includes(itemId) || ledger?.content !== `${JSON.stringify(seen)}\n`) throw conflict('Clock occurrence history')
+        const history = seen.filter(value => value !== itemId)
+        // The host's own record of that delivery (its instance, log lines and counts) goes first; a host without the purge, or one that refuses it, leaves both untouched.
+        const host = scoped.notifications as { purgeOccurrence?: (occurrenceId: string) => Promise<boolean> }
+        if (typeof host.purgeOccurrence !== 'function') throw Object.assign(new Error('This Valley version cannot remove a delivered Clock notification.'), { code: 'ACTION_UNAVAILABLE', outcome: 'not-applied', retryable: false })
+        effectAttempted = true
+        if (await host.purgeOccurrence(itemId) !== true) { effectAttempted = false; throw conflict('Clock notification history') }
+        const saved = await scoped.data.files.writeTextGuarded('workflow-occurrences.json', `${JSON.stringify(history)}\n`, ledger.baseline)
+        if (!saved.ok) throw conflict('Clock occurrence history')
+        seen = history
+        value = true
+        break
+      }
       default: throw new Error('Unknown Clock action.')
     }
     cancellation?.throwIfAborted()
