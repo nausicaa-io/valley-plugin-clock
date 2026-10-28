@@ -2,7 +2,7 @@
   "apiVersion": 5,
   "id": "clock",
   "name": "Clock",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Clock with world times, alarms, stopwatch, multiple timers and Pomodoro in the right sidebar.",
   "author": [
     "nausicaa"
