@@ -1,6 +1,6 @@
 # Clock
 
-Clock with world times, alarms, stopwatch, multiple timers and Pomodoro — in the right sidebar and the footer.
+Clock with world times, alarms, stopwatch, multiple timers and Pomodoro in the right sidebar.
 
 This repository owns the plugin’s interface, behavior, dependencies, schemas, tests, translations, and compiled releases. It uses Valley manifest API 5 and the injected SDK 6.
 
