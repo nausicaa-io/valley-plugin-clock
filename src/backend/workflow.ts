@@ -70,6 +70,15 @@ export function registerClockWorkflow(api: PluginBackendApi): () => Promise<void
       "inputProperty": "values"
     }
   },
+  "timer.snooze": {
+    "method": "command.clock.mutate",
+    "request": {
+      "constants": {
+        "method": "timer.snooze"
+      },
+      "inputProperty": "values"
+    }
+  },
   "pomo.select": {
     "method": "command.clock.mutate",
     "request": {

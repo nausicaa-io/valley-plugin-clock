@@ -15,7 +15,7 @@ function setup() {
   const handlers = new Map<string, (input: unknown, context?: PluginBackendOperationContext) => unknown>()
   const api = mock.backendApi
   api.rpc.handle = (method, handler) => { handlers.set(method, handler); return () => { handlers.delete(method) } }
-  api.rpc.handleOperation = (method, handler) => { handlers.set(method, async (input, context) => { const result = await handler(input, context!); const value = input as { nodeTypeId?: string; method?: string }; const id = method === 'command.clock.snapshot' ? 'snapshot' : method === 'command.stopwatch.get' ? 'stopwatch.get' : value.nodeTypeId ?? value.method!; const validate = outputSchemas.get(id)!; expect(validate(result), id + ': ' + JSON.stringify(validate.errors)).toBe(true); return result }); return () => { handlers.delete(method) } }
+  api.rpc.handleOperation = (method, handler) => { handlers.set(method, async (input, context) => { const result = await handler(input, context!); const value = input as { nodeTypeId?: string; method?: string }; const id = method === 'command.clock.snapshot' ? 'snapshot' : method === 'command.stopwatch.get' ? 'stopwatch.get' : value.method; const validate = id === undefined ? undefined : outputSchemas.get(id)!; if (validate) expect(validate(result), id + ': ' + JSON.stringify(validate.errors)).toBe(true); return result }); return () => { handlers.delete(method) } }
   const captureCausation = vi.fn(async () => 'workflow-origin')
   const context = { id: 'clock-action', cancellation: new AbortController().signal, api: { ...api, services: { ...api.services, captureCausation } } } as unknown as PluginBackendOperationContext
   const schemas = new Map<string, ReturnType<Ajv['compile']>>()
@@ -55,6 +55,26 @@ describe('Clock workflow contribution', () => {
       await h.handlers.get('command.clock.snapshot')!({}, h.context)
       for (const [id, validate] of outputSchemas) expect(validate({}), id).toBe(false)
     } finally { await h.off() }
+  })
+
+  it('snoozes a finished timer through the timer.snooze command and Workflow action, with the snooze in every declared result', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const h = setup()
+    const mutate = (method: string, values: Record<string, unknown> = {}) => h.handlers.get('command.clock.mutate')!({ method, values }, h.context) as Promise<{ value: unknown; snapshot: ClockSnapshot }>
+    try {
+      await h.mock.api.settings.set('alarmSnooze', 5)
+      const timer = (await h.execute('timer.start', { seconds: 60 })).items[0].json as { id: string; endsAt: number }
+      await expect(mutate('timer.snooze', { id: timer.id })).rejects.toMatchObject({ code: 'ACTION_UNAVAILABLE', outcome: 'not-applied' })
+      vi.setSystemTime(timer.endsAt)
+      h.mock.emitOccurrence({ key: `timer:${timer.id}`, eventId: 'clock.timer', occurrenceId: `${timer.id}:1`, scheduledAt: timer.endsAt, firedAt: timer.endsAt, missed: false })
+      const snoozed = await mutate('timer.snooze', { id: timer.id })
+      expect(snoozed.snapshot.timers[0]).toMatchObject({ id: timer.id, remaining: 0, snoozedUntil: timer.endsAt + 5 * 60_000 })
+      await h.handlers.get('command.clock.snapshot')!({}, h.context)
+      expect((await h.execute('timer.snooze', { id: timer.id })).items[0].json).toMatchObject({ value: true, snapshot: { timers: [expect.objectContaining({ snoozedUntil: expect.any(Number) })] } })
+      await expect(mutate('timer.snooze', { id: 'missing' })).rejects.toMatchObject({ code: 'ACTION_UNAVAILABLE', outcome: 'not-applied' })
+      const node = config.runtime.services[0].metadata!.workflow!.nodes.find(entry => entry.id === 'timer.snooze')
+      expect(node).toMatchObject({ type: 'action', effect: 'write', parameterSchema: { required: ['id'] } })
+    } finally { await h.off(); vi.useRealTimers() }
   })
 
   it('controls stopwatch state without a renderer through scoped, versioned commands', async () => {
