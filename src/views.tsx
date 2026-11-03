@@ -1013,6 +1013,7 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
     const card = (t: ClockTimer, index: number): ReturnType<typeof h> => {
       const remaining = store.timerRemaining(t)
       const done = remaining === 0 && !t.running
+      const snoozed = done && t.snoozedUntil !== undefined && t.snoozedUntil > Date.now()
       const frac = t.duration > 0 ? Math.min(1, Math.max(0, remaining / t.duration)) : 0
       const title = t.label.trim() || uiText('auto.9d9cec22f36f')
       const duration = fmtPresetLabel(Math.round(t.duration / 1000))
@@ -1071,12 +1072,14 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
               { className: 'clock-timer-meta clock-sub' },
               h('span', { className: 'clock-timer-title' }, title),
               h('span', { className: 'clock-timer-duration' }, duration),
-              !t.running && !done && h('span', { className: 'clock-timer-state' }, uiText('auto.60c22504e298'))
+              !t.running && !done && h('span', { className: 'clock-timer-state' }, uiText('auto.60c22504e298')),
+              snoozed && h('span', { className: 'clock-timer-state' }, uiText('clock.timer.snoozed'))
             )
           ),
           h(
             'div',
             { className: 'clock-card-actions' },
+            done && !snoozed && btn(uiText('auto.e2b51688f4b0'), () => store.snoozeTimer(t.id), 'secondary'),
             done
               ? btn(uiText('auto.e9b450d14bc2'), () => store.cancelTimer(t.id), 'primary')
               : t.running

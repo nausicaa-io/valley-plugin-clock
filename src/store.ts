@@ -80,6 +80,8 @@ export interface ClockStore {
   resumeTimer(id?: string): boolean
   restoreTimer(id: string, expected: TimerRunState, next: TimerRunState): void
   cancelTimer(id?: string): boolean
+  /** Ring a finished timer again after the snooze setting's minutes, like an alarm's Snooze. */
+  snoozeTimer(id: string): boolean
   /** Undo a timer's creation: removes it only while it is still exactly `expected`. */
   discardTimer(id: string, expected: ClockTimer): void
   timerRemaining(t: ClockTimer): number
@@ -250,6 +252,7 @@ function createStore(api: ValleyPluginApi): ClockStore {
     resumeTimer: timers.resume,
     restoreTimer: timers.restore,
     cancelTimer: timers.cancel,
+    snoozeTimer: timers.snooze,
     discardTimer: timers.discard,
     timerRemaining: timers.remaining,
     timerMove: timers.move,

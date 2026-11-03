@@ -69,10 +69,51 @@ describe('countdown owner', () => {
     expect(h.timers.items.map(timer => timer.id)).toEqual(['paused', 'future', 'expired'])
     expect(h.timers.items.map(h.timers.remaining)).toEqual([2000, 3000, 0])
     expect(schedule).toHaveBeenCalledOnce()
-    expect(schedule).toHaveBeenCalledWith('timer:future', [1_003_000], expect.objectContaining({ title: 'Tea', ring: { actions: ['stop'], sound: 'beep.wav' } }))
+    expect(schedule).toHaveBeenCalledWith('timer:future', [1_003_000], expect.objectContaining({ title: 'Tea', ring: { actions: ['stop', 'snooze'], snoozeMinutes: 9, sound: 'beep.wav' } }))
     expect(h.sound).not.toHaveBeenCalled()
     const persisted = (await readClockFile<Array<Record<string, unknown>>>(h.mock.api, 'timers.jsonl'))?.find(row => row.id === 'expired') ?? null
     expect(persisted).toMatchObject({ running: true, remaining: 5000 })
+  })
+
+  it('snoozes a finished timer like an alarm, for the alarm snooze minutes, and rings it again', async () => {
+    const h = harness()
+    await h.mock.api.settings.set('alarmSnooze', 4)
+    const schedule = vi.spyOn(h.mock.api.notifications, 'schedule')
+    const timer = h.timers.add(60, 'Tea')!
+    expect(schedule).toHaveBeenLastCalledWith(`timer:${timer.id}`, [1_060_000], expect.objectContaining({ ring: expect.objectContaining({ actions: ['stop', 'snooze'], snoozeMinutes: 4 }) }))
+    expect(h.timers.snooze(timer.id, true)).toBe(false)
+    h.time(1_060_000)
+    expect(h.timers.ring(timer.id, 1)).toBe(true)
+    // The host snoozed the ring from its notification: nothing is scheduled again here, and the next ring is accepted.
+    expect(h.timers.snooze(timer.id, false)).toBe(true)
+    expect(h.playback[0].stop).toHaveBeenCalledOnce()
+    expect(timer.snoozedUntil).toBe(1_060_000 + 4 * 60_000)
+    expect(schedule).toHaveBeenCalledOnce()
+    await h.flush()
+    expect((await readClockFile<Array<Record<string, unknown>>>(h.mock.api, 'timers.jsonl'))?.find(row => row.id === timer.id)).toMatchObject({ snoozedUntil: 1_300_000, remaining: 0 })
+    h.time(1_300_000)
+    expect(h.timers.ring(timer.id, 1)).toBe(true)
+    expect(timer.snoozedUntil).toBeUndefined()
+    // A timer that stopped ringing is armed again by its own Snooze.
+    h.timers.stop(timer.id)
+    expect(h.timers.snooze(timer.id, true)).toBe(true)
+    expect(schedule).toHaveBeenLastCalledWith(`timer:${timer.id}`, [1_540_000], expect.objectContaining({ title: 'Tea', ring: expect.objectContaining({ actions: ['stop', 'snooze'] }) }))
+    h.time(1_540_000)
+    expect(h.timers.ring(timer.id, 1)).toBe(true)
+    await h.flush()
+  })
+
+  it('re-arms a pending timer snooze after a reload and does not replay one that passed', async () => {
+    const h = harness()
+    await writeClockFile(h.mock.api, 'timers.jsonl', [
+      { id: 'snoozed', label: 'Tea', duration: 5000, endsAt: 990_000, remaining: 0, running: false, snoozedUntil: 1_200_000 },
+      { id: 'passed', label: '', duration: 5000, endsAt: 990_000, remaining: 0, running: false, snoozedUntil: 999_000 }
+    ])
+    const schedule = vi.spyOn(h.mock.api.notifications, 'schedule')
+    await h.timers.load([])
+    expect(schedule).toHaveBeenCalledOnce()
+    expect(schedule).toHaveBeenCalledWith('timer:snoozed', [1_200_000], expect.objectContaining({ title: 'Tea' }))
+    expect(h.timers.items.map(timer => timer.snoozedUntil)).toEqual([1_200_000, undefined])
   })
 
   it('stops the current sound on stop and ignores delayed repeats or rings for paused/deleted timers', async () => {

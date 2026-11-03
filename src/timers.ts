@@ -9,6 +9,8 @@ export interface ClockTimer {
   remaining: number
   running: boolean
   originReceipt?: string
+  /** Epoch ms a snoozed finished timer rings again, persisted so a reload re-arms it (the alarm snooze setting sets the delay). */
+  snoozedUntil?: number
 }
 
 export type TimerRunState = Pick<ClockTimer, 'running' | 'endsAt' | 'remaining' | 'originReceipt'>
@@ -55,11 +57,15 @@ export function createTimers(ports: TimerPorts) {
     if (timer && (!timer.running || timer.endsAt <= ports.now())) { touch(); stopped.add(id) }
     stopSound(id)
   }
-  const schedule = (timer: ClockTimer, api = ports.api()): void => {
+  const snoozeMinutes = (api = ports.api()): number => {
+    const value = api.settings.get().alarmSnooze
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 9
+  }
+  const schedule = (timer: ClockTimer, api = ports.api(), at = timer.endsAt): void => {
     stopped.delete(timer.id)
-    void api.notifications.schedule(key(timer.id), [timer.endsAt], {
+    void api.notifications.schedule(key(timer.id), [at], {
       eventId: 'timer', title: timer.label.trim() || ports.title(), body: ports.formatDuration(timer.duration),
-      ring: { sound: String(api.settings.get().alarmSound ?? 'beep').startsWith('file:') ? String(api.settings.get().alarmSound).slice(5) : `${api.settings.get().alarmSound ?? 'beep'}.wav`, actions: ['stop'] }
+      ring: { sound: String(api.settings.get().alarmSound ?? 'beep').startsWith('file:') ? String(api.settings.get().alarmSound).slice(5) : `${api.settings.get().alarmSound ?? 'beep'}.wav`, actions: ['stop', 'snooze'], snoozeMinutes: snoozeMinutes(api) }
     })
   }
   const persist = (): void => {
@@ -96,6 +102,10 @@ export function createTimers(ports: TimerPorts) {
         if (timer.running) {
           if (timer.endsAt <= now) { timer.running = false; timer.remaining = 0 }
           else schedule(timer, api)
+        } else if (timer.remaining <= 0 && typeof record.snoozedUntil === 'number' && Number.isFinite(record.snoozedUntil) && record.snoozedUntil > now) {
+          // A snooze that has not rung yet is re-armed; one that passed while Valley was closed is not replayed.
+          timer.snoozedUntil = record.snoozedUntil
+          schedule(timer, api, timer.snoozedUntil)
         }
         return [timer]
       })
@@ -117,6 +127,7 @@ export function createTimers(ports: TimerPorts) {
   return {
     get items(): ClockTimer[] { return items },
     remaining,
+    snoozeMinutes,
     stop,
     stopSounds,
     load,
@@ -128,6 +139,7 @@ export function createTimers(ports: TimerPorts) {
       touch()
       timer.running = false
       timer.remaining = 0
+      if (tick <= 1) delete timer.snoozedUntil
       if (!sounds.get(id)?.continuous) {
         stopSound(id)
         const sound = ports.sound()
@@ -135,6 +147,21 @@ export function createTimers(ports: TimerPorts) {
       }
       if (tick <= 1) persist()
       ports.notify()
+      return true
+    },
+    /**
+     * Snooze a finished timer like an alarm: its ring stops and it rings again after the snooze setting's minutes. `arm`
+     * schedules that ring here; it stays false when the host already re-armed a ring it snoozed itself.
+     */
+    snooze(id: string, arm: boolean): boolean {
+      const timer = find(id)
+      if (!timer || timer.running || timer.remaining > 0) return false
+      stopSound(id)
+      touch()
+      timer.snoozedUntil = ports.now() + snoozeMinutes() * 60_000
+      if (arm) schedule(timer, ports.api(), timer.snoozedUntil)
+      else stopped.delete(id)
+      changed()
       return true
     },
     add(seconds: number, label?: string, identity?: { id?: string; originReceipt?: string }): ClockTimer | null {
@@ -173,6 +200,7 @@ export function createTimers(ports: TimerPorts) {
       timer.remaining = next.remaining
       if (next.originReceipt === undefined) delete timer.originReceipt
       else timer.originReceipt = next.originReceipt
+      delete timer.snoozedUntil
       if (timer.running) schedule(timer)
       else { stop(timer.id); void ports.api().notifications.cancel(key(timer.id)) }
       changed()
@@ -202,7 +230,10 @@ export function createTimers(ports: TimerPorts) {
       const timer = find(id)
       if (!timer || (patch.duration !== undefined && (timer.running || !Number.isFinite(patch.duration) || patch.duration <= 0))) return null
       if (patch.label !== undefined) timer.label = patch.label
-      if (patch.duration !== undefined) { timer.duration = patch.duration; timer.remaining = patch.duration; timer.endsAt = 0 }
+      if (patch.duration !== undefined) {
+        if (timer.snoozedUntil !== undefined) { delete timer.snoozedUntil; stopSound(timer.id); void ports.api().notifications.cancel(key(timer.id)) }
+        timer.duration = patch.duration; timer.remaining = patch.duration; timer.endsAt = 0
+      }
       changed()
       return timer
     },

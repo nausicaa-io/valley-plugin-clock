@@ -194,6 +194,15 @@ export function createClockOwner(api: PluginBackendApi) {
         if (value) timers.stop(itemId ?? '')
         break
       }
+      case 'timer.snooze': {
+        const timer = timers.items.find(item => item.id === itemId)
+        if (!timer) { value = false; break }
+        if (timer.running || timer.remaining > 0) throw refused('Only a finished timer can be snoozed.', 'ACTION_UNAVAILABLE')
+        // A ringing timer is snoozed by the host like an alarm; a finished one that stopped ringing is armed again here.
+        const rang = await hostRing(() => scoped.notifications.snooze(`timer:${itemId}`, timers.snoozeMinutes()))
+        value = timers.snooze(timer.id, !rang)
+        break
+      }
       case 'timer.update': {
         const patch = args[1] as { label?: unknown; duration?: unknown }
         if (!patch || typeof patch !== 'object') throw invalid('Expected timer values.')
@@ -314,6 +323,7 @@ export function createClockOwner(api: PluginBackendApi) {
     if (event.action !== 'stop' && event.action !== 'snooze') return
     void serialize(async () => {
       if (event.key.startsWith('timer:') && event.action === 'stop') timers.stop(event.key.slice(6))
+      if (event.key.startsWith('timer:') && event.action === 'snooze') timers.snooze(event.key.slice(6), false)
       if (event.key.startsWith('alarm:')) alarms.action(event.key.slice(6), event.action as 'stop' | 'snooze')
       await flush(); publish()
     }).catch(error => api.rpc.emit('clock.error', { message: error instanceof Error ? error.message : String(error) }))

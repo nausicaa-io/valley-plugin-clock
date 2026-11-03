@@ -210,6 +210,16 @@ export function createClockClient(ports: ClockClientPorts) {
         stopSound(timerSounds, id)
         send('timer.discard', [id, structuredClone(expected)], state => { state.timers = state.timers.filter(item => item.id !== id) })
       },
+      snooze: (id: string) => {
+        const value = timer(id)
+        if (!value || value.running || value.remaining > 0) return false
+        const minutes = Number(ports.api().settings.get().alarmSnooze)
+        const snoozedUntil = Date.now() + (Number.isFinite(minutes) && minutes > 0 ? minutes : 9) * 60_000
+        stopSound(timerSounds, id)
+        stoppedTimers.delete(id)
+        send('timer.snooze', [id], state => { const item = state.timers.find(item => item.id === id); if (item) item.snoozedUntil = snoozedUntil })
+        return true
+      },
       cancel: (id?: string) => {
         const value = timer(id)
         if (!value) return false

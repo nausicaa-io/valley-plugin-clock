@@ -1,5 +1,5 @@
 import Ajv from 'ajv'
-import { readClockFile } from '../src/persistence'
+import { readClockFile, writeClockFile } from '../src/persistence'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -623,6 +623,27 @@ describe('clock plugin', () => {
       expect(container.querySelector('svg[viewBox="0 0 100 100"]')).toBeNull()
       expect(container.querySelector('.clock-progress-fill')).not.toBeNull()
       expect(container.textContent).toMatch(/05:00/)
+    })
+  })
+
+  it('offers Snooze on a finished timer and shows it snoozed until it rings again', async () => {
+    const mock = createMockValleyApi({ manifest: { id: 'clock' } })
+    await writeClockFile(mock.api, 'timers.jsonl', [{ id: 'tea', label: 'Tea', duration: 60_000, endsAt: Date.now() - 1000, remaining: 0, running: false }])
+    await mock.api.settings.set('timerOrder', JSON.stringify(['tea']))
+    register(mock.api)
+    const store = mock.api.runtime.getOrCreate<ClockStore>('clock.store', () => { throw new Error('missing store') })
+    await store.ready
+    const calls = (mock.api.registerView as unknown as { mock: { calls: [string, React.ComponentType][] } }).mock.calls
+    const Panel = calls.find(([id]) => id === 'clock.panel')![1]
+    await withStubbedRaf(async () => {
+      render(React.createElement(Panel))
+      fireEvent.click(screen.getByRole('tab', { name: 'Timer' }))
+      await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Snooze' })) })
+      await act(async () => { await store.flush() })
+      expect(store.state.timers[0].snoozedUntil).toBeGreaterThan(Date.now())
+      expect(screen.queryByRole('button', { name: 'Snooze' })).toBeNull()
+      expect(screen.getByText('(snoozed)')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy()
     })
   })
 

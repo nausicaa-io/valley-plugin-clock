@@ -164,6 +164,32 @@ describe('background Clock owner', () => {
     await owner.dispose()
   })
 
+  it('snoozes a finished timer from its notification or the panel for the alarm snooze minutes', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(1_000_000)
+    const h = createMockValleyApi({ manifest: { id: 'clock' } })
+    await h.api.settings.set('alarmSnooze', 5)
+    const owner = h.clockOwner()
+    await owner.mutate({ method: 'timer.add', args: ['tea', 60, 'Tea'] })
+    expect(h.scheduledNotifications.get('timer:tea')).toMatchObject({ occurrences: [1_060_000], spec: { ring: { actions: ['stop', 'snooze'], snoozeMinutes: 5 } } })
+    await expect(owner.mutate({ method: 'timer.snooze', args: ['tea'] })).rejects.toMatchObject({ code: 'ACTION_UNAVAILABLE', outcome: 'not-applied' })
+    vi.setSystemTime(1_060_000)
+    h.emitOccurrence({ key: 'timer:tea', eventId: 'clock.timer', occurrenceId: 'tea:1', scheduledAt: 1_060_000, firedAt: 1_060_000, missed: false })
+    expect((await owner.snapshot()).timers[0]).toMatchObject({ running: false, remaining: 0 })
+    // The notification's Snooze: the host re-armed its ring, the owner records when it rings again.
+    h.emitNotificationAction({ key: 'timer:tea', eventId: 'clock.timer', action: 'snooze' })
+    expect((await owner.snapshot()).timers[0].snoozedUntil).toBe(1_060_000 + 5 * 60_000)
+    vi.setSystemTime(1_360_000)
+    h.emitOccurrence({ key: 'timer:tea', eventId: 'clock.timer', occurrenceId: 'tea:2', scheduledAt: 1_360_000, firedAt: 1_360_000, missed: false })
+    expect((await owner.snapshot()).timers[0].snoozedUntil).toBeUndefined()
+    expect(h.backendApi.services.emit).toHaveBeenCalledTimes(2)
+    // The panel's Snooze goes through the host's ring snooze with the same minutes.
+    await owner.mutate({ method: 'timer.snooze', args: ['tea'] })
+    expect(h.notificationCalls).toContainEqual({ method: 'snooze', key: 'timer:tea', minutes: 5 })
+    expect((await owner.snapshot()).timers[0].snoozedUntil).toBe(1_360_000 + 5 * 60_000)
+    expect((await readClockFile<Array<Record<string, unknown>>>(h.api, 'timers.jsonl'))?.[0]).toMatchObject({ id: 'tea', snoozedUntil: 1_660_000 })
+    await owner.dispose()
+  })
+
   it('reflects backend edits in the existing UI store and schedules only in the backend', async () => {
     const h = createMockValleyApi({ manifest: { id: 'clock' } })
     const off = register(h.api)
