@@ -130,6 +130,22 @@ describe('background Clock owner', () => {
     await owner.dispose()
   })
 
+  it('reports invalid alarm and timer input as not applied before any write', async () => {
+    const h = createMockValleyApi({ manifest: { id: 'clock' } })
+    const owner = h.clockOwner()
+    await owner.mutate({ method: 'alarm.add', args: ['wake', { hour: 8, minute: 0, label: 'Start', days: [] }] })
+    const before = await owner.snapshot()
+    const notApplied = (code: string) => expect.objectContaining({ code, outcome: 'not-applied' })
+    await expect(owner.mutate({ method: 'alarm.update', args: ['wake', { sound: '../../escape' }] })).rejects.toEqual(notApplied('INVALID_INPUT'))
+    await expect(owner.mutate({ method: 'alarm.update', args: ['wake', { hour: 25 }] })).rejects.toEqual(notApplied('INVALID_INPUT'))
+    await expect(owner.mutate({ method: 'alarm.add', args: ['wake', { hour: 9, minute: 0, label: '', days: [] }] })).rejects.toEqual(notApplied('ALREADY_EXISTS'))
+    await expect(owner.mutate({ method: 'timer.add', args: ['long', 3600000] })).rejects.toEqual(notApplied('INVALID_INPUT'))
+    await expect(owner.mutate({ method: 'timer.update', args: ['long', { duration: -1 }] })).rejects.toEqual(notApplied('INVALID_INPUT'))
+    await expect(owner.mutate({ method: 'no.such', args: [] })).rejects.toEqual(notApplied('INVALID_INPUT'))
+    expect(await owner.snapshot()).toMatchObject({ alarms: before.alarms, timers: before.timers })
+    await owner.dispose()
+  })
+
   it('fires alarms once and keeps disable, enable, and snooze state in the same owner', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 8, 30, 7))

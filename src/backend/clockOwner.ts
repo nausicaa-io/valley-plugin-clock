@@ -19,34 +19,36 @@ export interface ClockSnapshot {
 type OperationApi = Pick<PluginBackendApi, 'data' | 'settings' | 'notifications' | 'services'> & { rpc: Pick<PluginBackendApi['rpc'], 'emit'> }
 export type ClockMutation = { method: string; args: unknown[]; expectedSession?: string; expectedRevision?: number }
 const maximumSeconds = 999 * 3600 + 3599
+const refused = (message: string, code: string) => Object.assign(new Error(message), { code, outcome: 'not-applied' as const, retryable: false })
+const invalid = (message: string) => refused(message, 'INVALID_INPUT')
 const label = (value: unknown) => {
   if (value === undefined) return ''
-  if (typeof value !== 'string' || value.length > 40) throw new Error('A timer name can contain at most 40 characters.')
+  if (typeof value !== 'string' || value.length > 40) throw invalid('A timer name can contain at most 40 characters.')
   return value
 }
 const identifier = (value: unknown): string | undefined => {
   if (value === undefined || value === null) return undefined
-  if (typeof value !== 'string' || !value || value.length > 200 || /[\x00-\x1f]/.test(value)) throw new Error('Invalid Clock item id.')
+  if (typeof value !== 'string' || !value || value.length > 200 || /[\x00-\x1f]/.test(value)) throw invalid('Invalid Clock item id.')
   return value
 }
 
 const timerRunState = (value: unknown): TimerRunState => {
   const record = value as Partial<TimerRunState> | null
   const time = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
-  if (!record || typeof record !== 'object' || typeof record.running !== 'boolean' || !time(record.endsAt) || !time(record.remaining) || (record.originReceipt !== undefined && typeof record.originReceipt !== 'string')) throw new Error('Invalid timer state.')
+  if (!record || typeof record !== 'object' || typeof record.running !== 'boolean' || !time(record.endsAt) || !time(record.remaining) || (record.originReceipt !== undefined && typeof record.originReceipt !== 'string')) throw invalid('Invalid timer state.')
   return { running: record.running, endsAt: record.endsAt!, remaining: record.remaining!, ...(record.originReceipt === undefined ? {} : { originReceipt: record.originReceipt }) }
 }
 
 const timerRecord = (value: unknown): ClockTimer => {
   const record = value as Partial<ClockTimer> | null
-  if (!record || typeof record !== 'object' || typeof record.id !== 'string' || typeof record.label !== 'string' || typeof record.duration !== 'number' || !Number.isFinite(record.duration)) throw new Error('Invalid timer.')
+  if (!record || typeof record !== 'object' || typeof record.id !== 'string' || typeof record.label !== 'string' || typeof record.duration !== 'number' || !Number.isFinite(record.duration)) throw invalid('Invalid timer.')
   return { id: record.id, label: record.label, duration: record.duration, ...timerRunState(record) }
 }
 
 const pomoState = (value: unknown): PomoState => {
   const record = value as Partial<PomoState> | null
   const time = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
-  if (!record || typeof record !== 'object' || !['work', 'short', 'long'].includes(record.phase as string) || !Number.isSafeInteger(record.cycle) || (record.cycle as number) < 0 || typeof record.running !== 'boolean' || !time(record.endsAt) || !time(record.remaining)) throw new Error('Invalid Pomodoro state.')
+  if (!record || typeof record !== 'object' || !['work', 'short', 'long'].includes(record.phase as string) || !Number.isSafeInteger(record.cycle) || (record.cycle as number) < 0 || typeof record.running !== 'boolean' || !time(record.endsAt) || !time(record.remaining)) throw invalid('Invalid Pomodoro state.')
   return { phase: record.phase as PomoState['phase'], cycle: record.cycle as number, running: record.running, endsAt: record.endsAt as number, remaining: record.remaining as number }
 }
 
@@ -57,7 +59,7 @@ const alarmRecord = (value: unknown): ClockAlarm | null => {
   const optional = (n: unknown, valid: (n: unknown) => boolean) => n === undefined || valid(n)
   if (!record || typeof record !== 'object' || typeof identifier(record.id) !== 'string' || !Number.isInteger(record.hour) || (record.hour as number) < 0 || (record.hour as number) > 23 || !Number.isInteger(record.minute) || (record.minute as number) < 0 || (record.minute as number) > 59
     || typeof record.label !== 'string' || !Array.isArray(record.days) || record.days.some(day => !Number.isInteger(day) || day < 0 || day > 6) || !isSoundId(record.sound) || typeof record.enabled !== 'boolean'
-    || !optional(record.date, n => typeof n === 'string') || !optional(record.originReceipt, n => typeof n === 'string') || !optional(record.snoozedUntil, n => typeof n === 'number' && Number.isFinite(n))) throw new Error('Invalid alarm.')
+    || !optional(record.date, n => typeof n === 'string') || !optional(record.originReceipt, n => typeof n === 'string') || !optional(record.snoozedUntil, n => typeof n === 'number' && Number.isFinite(n))) throw invalid('Invalid alarm.')
   // Keep the saved key order so a restored record serializes to the same bytes.
   return Object.fromEntries(Object.keys(record).filter(key => (alarmKeys as readonly string[]).includes(key)).map(key => [key, key === 'days' ? [...record.days!] : record[key as keyof ClockAlarm]])) as unknown as ClockAlarm
 }
@@ -66,7 +68,7 @@ const conflict = (subject: string) => Object.assign(new Error(`${subject} change
 const stopwatchState = (value: unknown): SwState => {
   const record = value as Partial<SwState> | null
   const time = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0
-  if (!record || typeof record !== 'object' || typeof record.running !== 'boolean' || !time(record.startedAt) || !time(record.elapsed) || !Array.isArray(record.laps) || !record.laps.every(time) || record.running !== (record.startedAt as number) > 0) throw new Error('Invalid stopwatch state.')
+  if (!record || typeof record !== 'object' || typeof record.running !== 'boolean' || !time(record.startedAt) || !time(record.elapsed) || !Array.isArray(record.laps) || !record.laps.every(time) || record.running !== (record.startedAt as number) > 0) throw invalid('Invalid stopwatch state.')
   return { running: record.running, startedAt: record.startedAt as number, elapsed: record.elapsed as number, laps: [...record.laps] as number[] }
 }
 
@@ -129,7 +131,7 @@ export function createClockOwner(api: PluginBackendApi) {
   const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
     const next = pending.catch(() => {}).then(async () => {
       await ready
-      if (!active) throw new Error('Clock service is stopped.')
+      if (!active) throw refused('Clock service is stopped.', 'NOT_READY')
       effectAttempted = false
       try { return await operation() } catch (error) {
         const uncertain = effectAttempted
@@ -159,13 +161,13 @@ export function createClockOwner(api: PluginBackendApi) {
     switch (request.method) {
       case 'stopwatch.start': stopwatch.start(); value = true; break
       case 'stopwatch.stop': stopwatch.stop(); value = true; break
-      case 'stopwatch.lap': if (!stopwatch.state.running) throw new Error('Start the stopwatch before recording a lap.'); stopwatch.lap(); value = true; break
+      case 'stopwatch.lap': if (!stopwatch.state.running) throw refused('Start the stopwatch before recording a lap.', 'ACTION_UNAVAILABLE'); stopwatch.lap(); value = true; break
       case 'stopwatch.reset': stopwatch.reset(); value = true; break
       case 'stopwatch.restore': stopwatch.restore(stopwatchState(args[1])); value = true; break
       case 'timer.add': {
         const seconds = args[1]
-        if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0 || seconds > maximumSeconds) throw new Error('Timer duration must be between one second and 999:59:59.')
-        if (itemId && timers.items.some(timer => timer.id === itemId)) throw new Error('This timer already exists.')
+        if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0 || seconds > maximumSeconds) throw invalid('Timer duration must be between one second and 999:59:59.')
+        if (itemId && timers.items.some(timer => timer.id === itemId)) throw refused('This timer already exists.', 'ALREADY_EXISTS')
         value = timers.add(seconds, label(args[2]), { id: itemId, originReceipt })
         break
       }
@@ -194,8 +196,8 @@ export function createClockOwner(api: PluginBackendApi) {
       }
       case 'timer.update': {
         const patch = args[1] as { label?: unknown; duration?: unknown }
-        if (!patch || typeof patch !== 'object') throw new Error('Expected timer values.')
-        if (patch.duration !== undefined && (typeof patch.duration !== 'number' || !Number.isFinite(patch.duration) || patch.duration <= 0 || patch.duration > maximumSeconds * 1000)) throw new Error('Invalid timer duration.')
+        if (!patch || typeof patch !== 'object') throw invalid('Expected timer values.')
+        if (patch.duration !== undefined && (typeof patch.duration !== 'number' || !Number.isFinite(patch.duration) || patch.duration <= 0 || patch.duration > maximumSeconds * 1000)) throw invalid('Invalid timer duration.')
         value = timers.update(itemId ?? '', { ...(patch.label === undefined ? {} : { label: label(patch.label) }), ...(patch.duration === undefined ? {} : { duration: patch.duration as number }) })
         break
       }
@@ -203,17 +205,17 @@ export function createClockOwner(api: PluginBackendApi) {
       case 'alarm.add':
       case 'alarm.update': {
         const values = args[1] as Partial<ClockAlarm> | undefined
-        if (!values || typeof values !== 'object') throw new Error('Expected alarm values.')
-        if ((values.hour !== undefined && (!Number.isInteger(values.hour) || values.hour < 0 || values.hour > 23)) || (values.minute !== undefined && (!Number.isInteger(values.minute) || values.minute < 0 || values.minute > 59))) throw new Error('Invalid alarm time.')
-        if (values.days !== undefined && (!Array.isArray(values.days) || values.days.some(day => !Number.isInteger(day) || day < 0 || day > 6))) throw new Error('Invalid alarm weekdays.')
-        if (values.sound !== undefined && !isSoundId(values.sound)) throw new Error('Invalid alarm sound.')
-        if (values.date !== undefined && values.date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.date) || !Number.isFinite(Date.parse(`${values.date}T12:00:00Z`)) || new Date(`${values.date}T12:00:00Z`).toISOString().slice(0, 10) !== values.date)) throw new Error('Invalid alarm date.')
-        if (values.label !== undefined && typeof values.label !== 'string') throw new Error('Expected an alarm name.')
+        if (!values || typeof values !== 'object') throw invalid('Expected alarm values.')
+        if ((values.hour !== undefined && (!Number.isInteger(values.hour) || values.hour < 0 || values.hour > 23)) || (values.minute !== undefined && (!Number.isInteger(values.minute) || values.minute < 0 || values.minute > 59))) throw invalid('Invalid alarm time.')
+        if (values.days !== undefined && (!Array.isArray(values.days) || values.days.some(day => !Number.isInteger(day) || day < 0 || day > 6))) throw invalid('Invalid alarm weekdays.')
+        if (values.sound !== undefined && !isSoundId(values.sound)) throw invalid('Invalid alarm sound.')
+        if (values.date !== undefined && values.date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.date) || !Number.isFinite(Date.parse(`${values.date}T12:00:00Z`)) || new Date(`${values.date}T12:00:00Z`).toISOString().slice(0, 10) !== values.date)) throw invalid('Invalid alarm date.')
+        if (values.label !== undefined && typeof values.label !== 'string') throw invalid('Expected an alarm name.')
         const safe = { ...values, ...(values.label === undefined ? {} : { label: values.label.trim() }) }
         delete safe.id
         delete safe.originReceipt
         if (request.method === 'alarm.add') {
-          if (itemId && alarms.items.some(alarm => alarm.id === itemId)) throw new Error('This alarm already exists.')
+          if (itemId && alarms.items.some(alarm => alarm.id === itemId)) throw refused('This alarm already exists.', 'ALREADY_EXISTS')
           value = alarms.add(safe, { id: itemId, originReceipt })
         } else value = alarms.update(itemId ?? '', safe)
         break
@@ -223,13 +225,13 @@ export function createClockOwner(api: PluginBackendApi) {
         const expected = alarmRecord(args[1])
         const next = alarmRecord(args[2])
         const index = args[3] === undefined ? undefined : Number(args[3])
-        if (index !== undefined && (!Number.isSafeInteger(index) || index < 0)) throw new Error('Invalid alarm position.')
+        if (index !== undefined && (!Number.isSafeInteger(index) || index < 0)) throw invalid('Invalid alarm position.')
         if (!itemId || (!expected && !next) || (expected && expected.id !== itemId) || (next && next.id !== itemId) || !alarms.restore(itemId, expected, next, index)) throw conflict('Alarm')
         value = true
         break
       }
       case 'alarm.toggle': {
-        if (args[1] !== undefined && typeof args[1] !== 'boolean') throw new Error('Expected an alarm enabled flag.')
+        if (args[1] !== undefined && typeof args[1] !== 'boolean') throw invalid('Expected an alarm enabled flag.')
         const alarm = alarms.items.find(item => item.id === itemId)
         if (alarm && originReceipt) alarm.originReceipt = originReceipt
         if (!alarm) value = null
@@ -259,7 +261,7 @@ export function createClockOwner(api: PluginBackendApi) {
       case 'pomo.move': value = pomodoro.moveProfile(Number(args[1]), Number(args[2])); break
       case 'pomo.update': {
         const patch = args[1] as Record<string, unknown>
-        if (!patch || typeof patch !== 'object' || Object.entries(patch).some(([key, value]) => !['work', 'short', 'long', 'cycles'].includes(key) || typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 1440)) throw new Error('Invalid Pomodoro duration.')
+        if (!patch || typeof patch !== 'object' || Object.entries(patch).some(([key, value]) => !['work', 'short', 'long', 'cycles'].includes(key) || typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value > 1440)) throw invalid('Invalid Pomodoro duration.')
         pomodoro.updateProfile(itemId ?? '', patch); break
       }
       case 'occurrence.delete': {
@@ -278,7 +280,7 @@ export function createClockOwner(api: PluginBackendApi) {
         value = true
         break
       }
-      default: throw new Error('Unknown Clock action.')
+      default: throw invalid('Unknown Clock action.')
     }
     cancellation?.throwIfAborted()
     await flush()
