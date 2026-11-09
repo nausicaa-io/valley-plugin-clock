@@ -1,5 +1,6 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { uiText } from './localization'
+import { whileVisible } from './visibility'
 import type { ClockStore } from './store'
 import { type AlarmSoundId, type SoundPlayback } from './sounds'
 import { CITIES, cityId, cityName, cityMatches, cityTime, isDaytime, dayOffsetLabel, offsetLabel } from './worldClock'
@@ -1280,8 +1281,7 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
     React.useEffect(() => {
       if (store.state.mode !== 'alarm') return
       void store.refreshSounds()
-      const interval = window.setInterval(() => { void store.refreshSounds() }, 3000)
-      return () => window.clearInterval(interval)
+      return whileVisible(() => { void store.refreshSounds() }, 3000)
     }, [store.state.mode])
     const { weekStart, timeFormat } = useHostState()
     const showSeconds = s.seconds !== false

@@ -2,6 +2,7 @@ import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { uiText } from './localization'
 import type { ClockStore } from './store'
 import type { PomoConfig, PomodoroProfile } from './pomodoro'
+import { whileVisible } from './visibility'
 import { VIEW_SETTING, timerPresetEntries, fmtPresetLabel, type ClockView } from './preferences'
 import { parseDuration } from './timers'
 import { setIconDragImage, dropDestination, type DragLike } from './reorder'
@@ -36,11 +37,11 @@ export function createClockSettings(api: ValleyPluginApi, store: ClockStore, { w
       const off = store.subscribe(rerender)
       const offSettings = api.settings.subscribe(rerender)
       // Only the World list shows live times — tick just for it.
-      const iv = sec === 'world' ? window.setInterval(rerender, 1000) : 0
+      const stopTick = sec === 'world' ? whileVisible(rerender, 1000) : undefined
       return () => {
         off()
         offSettings()
-        if (iv) window.clearInterval(iv)
+        stopTick?.()
       }
     }, [sec])
     React.useEffect(() => {
@@ -56,8 +57,7 @@ export function createClockSettings(api: ValleyPluginApi, store: ClockStore, { w
     React.useEffect(() => {
       if (sec !== 'alarm') return
       void store.refreshSounds()
-      const interval = window.setInterval(() => { void store.refreshSounds() }, 3000)
-      return () => window.clearInterval(interval)
+      return whileVisible(() => { void store.refreshSounds() }, 3000)
     }, [sec])
     const s = api.settings.get()
     const set = (key: string, value: unknown): void => {

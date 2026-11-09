@@ -63,7 +63,7 @@ describe('alarm sound folder', () => {
     const mock = createMockValleyApi()
     const preview = mockPreviewPlayback(mock.api)
     let resolve!: (value: unknown) => void
-    vi.mocked(mock.api.backend.call).mockImplementation(() => new Promise(done => { resolve = done }))
+    vi.mocked(mock.api.backend.call).mockImplementation((() => new Promise(done => { resolve = done })) as never)
     const player = createSoundPlayer(() => mock.api)
     const cancelled = player.play('file:Forest.mp3')!
     cancelled.stop()
