@@ -184,6 +184,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   // Stopwatch
   reg({
     id: 'sw-start',
+    menu: { group: 'stopwatch', order: 10, label: 'Start Stopwatch', labelKey: 'menu.startStopwatch' },
     label: "Clock: Start stopwatch", labelKey: 'auto.bc5b66e6c26b',
     sideEffect: 'write',
     run: () => {
@@ -197,6 +198,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'sw-stop',
+    menu: { group: 'stopwatch', order: 20, label: 'Stop Stopwatch', labelKey: 'menu.stopStopwatch' },
     label: "Clock: Stop stopwatch", labelKey: 'auto.557994cd7327',
     sideEffect: 'write',
     run: () => {
@@ -210,6 +212,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'sw-lap',
+    menu: { group: 'stopwatch', order: 30, label: 'Lap', labelKey: 'menu.lapStopwatch' },
     label: "Clock: Lap stopwatch", labelKey: 'auto.ef22d051b2c7',
     sideEffect: 'write',
     run: () => {
@@ -221,6 +224,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'sw-reset',
+    menu: { group: 'stopwatch', order: 40, label: 'Reset Stopwatch', labelKey: 'menu.resetStopwatch' },
     label: "Clock: Reset stopwatch", labelKey: 'auto.bbb44faa3c13',
     sideEffect: 'write',
     run: () => {
@@ -263,6 +267,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'timer-pause',
+    menu: { group: 'timer', order: 50, label: 'Pause Timer', labelKey: 'menu.pauseTimer' },
     label: "Clock: Pause a timer", labelKey: 'auto.8002918e458d',
     sideEffect: 'write',
     input: {
@@ -281,6 +286,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'timer-resume',
+    menu: { group: 'timer', order: 60, label: 'Resume Timer', labelKey: 'menu.resumeTimer' },
     label: "Clock: Resume a timer", labelKey: 'auto.3db28890b6e6',
     sideEffect: 'write',
     input: {
@@ -300,6 +306,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'timer-cancel',
+    menu: { group: 'timer', order: 70, label: 'Cancel Timer', labelKey: 'menu.cancelTimer' },
     label: "Clock: Cancel a timer", labelKey: 'auto.9ffe5ff9b2a2',
     sideEffect: 'write',
     input: {
@@ -317,6 +324,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'timer-list',
+    menu: false,
     label: "Clock: List timers", labelKey: 'auto.fdb76665287e',
     sideEffect: 'read',
     run: () => ({
@@ -397,6 +405,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'world-list',
+    menu: false,
     label: "Clock: List world cities", labelKey: 'auto.6a65a293678d',
     sideEffect: 'read',
     run: () => {
@@ -519,6 +528,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'alarm-list',
+    menu: false,
     label: "Clock: List alarms", labelKey: 'auto.aa21c27f35a8',
     sideEffect: 'read',
     run: () => ({ alarms: store.state.alarms.map((a) => ({ id: a.id, text: fmtAlarm(a) })) }),
@@ -528,6 +538,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   // Pomodoro
   reg({
     id: 'pomodoro-start',
+    menu: { group: 'pomodoro', order: 80, label: 'Start Pomodoro', labelKey: 'menu.startPomodoro' },
     label: "Clock: Start Pomodoro", labelKey: 'auto.f65ee22b00b8',
     sideEffect: 'write',
     run: async () => {
@@ -540,6 +551,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'pomodoro-pause',
+    menu: { group: 'pomodoro', order: 90, label: 'Pause Pomodoro', labelKey: 'menu.pausePomodoro' },
     label: "Clock: Pause Pomodoro", labelKey: 'auto.595d0b10adc0',
     sideEffect: 'write',
     run: async () => {
@@ -552,6 +564,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'pomodoro-reset',
+    menu: { group: 'pomodoro', order: 100, label: 'Reset Pomodoro', labelKey: 'menu.resetPomodoro' },
     label: "Clock: Reset Pomodoro", labelKey: 'auto.5aee8fbc51d9',
     sideEffect: 'write',
     run: () => {
@@ -564,6 +577,7 @@ export function registerCommands(api: ValleyPluginApi, store: ClockStore): Array
   })
   reg({
     id: 'pomodoro-skip',
+    menu: { group: 'pomodoro', order: 110, label: 'Skip Phase', labelKey: 'menu.skipPomodoroPhase' },
     label: "Clock: Skip Pomodoro phase", labelKey: 'auto.53b04ab58b1c',
     sideEffect: 'write',
     run: async () => {

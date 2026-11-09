@@ -210,5 +210,16 @@
   "clock.error.title": "Clock 无法保存此更改",
   "clock.error.dismiss": "关闭",
   "bookmark.view": "时钟视图",
-  "bookmark.item": "所选项目"
+  "bookmark.item": "所选项目",
+  "menu.startStopwatch": "启动秒表",
+  "menu.stopStopwatch": "停止秒表",
+  "menu.lapStopwatch": "计圈",
+  "menu.resetStopwatch": "重置秒表",
+  "menu.pauseTimer": "暂停计时器",
+  "menu.resumeTimer": "恢复计时器",
+  "menu.cancelTimer": "取消计时器",
+  "menu.startPomodoro": "开始番茄钟",
+  "menu.pausePomodoro": "暂停番茄钟",
+  "menu.resetPomodoro": "重置番茄钟",
+  "menu.skipPomodoroPhase": "跳过阶段"
 }

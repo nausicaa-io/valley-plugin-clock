@@ -210,5 +210,16 @@
   "clock.error.title": "Clock no pudo guardar este cambio",
   "clock.error.dismiss": "Cerrar",
   "bookmark.view": "Vista del reloj",
-  "bookmark.item": "Elemento seleccionado"
+  "bookmark.item": "Elemento seleccionado",
+  "menu.startStopwatch": "Iniciar cronómetro",
+  "menu.stopStopwatch": "Detener cronómetro",
+  "menu.lapStopwatch": "Vuelta",
+  "menu.resetStopwatch": "Reiniciar cronómetro",
+  "menu.pauseTimer": "Pausar temporizador",
+  "menu.resumeTimer": "Reanudar temporizador",
+  "menu.cancelTimer": "Cancelar temporizador",
+  "menu.startPomodoro": "Iniciar Pomodoro",
+  "menu.pausePomodoro": "Pausar Pomodoro",
+  "menu.resetPomodoro": "Reiniciar Pomodoro",
+  "menu.skipPomodoroPhase": "Omitir fase"
 }

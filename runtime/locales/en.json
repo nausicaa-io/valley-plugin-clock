@@ -210,5 +210,16 @@
   "clock.error.title": "Clock could not save this change",
   "clock.error.dismiss": "Dismiss",
   "bookmark.view": "Clock view",
-  "bookmark.item": "Selected item"
+  "bookmark.item": "Selected item",
+  "menu.startStopwatch": "Start Stopwatch",
+  "menu.stopStopwatch": "Stop Stopwatch",
+  "menu.lapStopwatch": "Lap",
+  "menu.resetStopwatch": "Reset Stopwatch",
+  "menu.pauseTimer": "Pause Timer",
+  "menu.resumeTimer": "Resume Timer",
+  "menu.cancelTimer": "Cancel Timer",
+  "menu.startPomodoro": "Start Pomodoro",
+  "menu.pausePomodoro": "Pause Pomodoro",
+  "menu.resetPomodoro": "Reset Pomodoro",
+  "menu.skipPomodoroPhase": "Skip Phase"
 }

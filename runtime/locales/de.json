@@ -210,5 +210,16 @@
   "clock.error.title": "Clock konnte diese Änderung nicht speichern",
   "clock.error.dismiss": "Schliessen",
   "bookmark.view": "Uhransicht",
-  "bookmark.item": "Ausgewählter Eintrag"
+  "bookmark.item": "Ausgewählter Eintrag",
+  "menu.startStopwatch": "Stoppuhr starten",
+  "menu.stopStopwatch": "Stoppuhr anhalten",
+  "menu.lapStopwatch": "Runde",
+  "menu.resetStopwatch": "Stoppuhr zurücksetzen",
+  "menu.pauseTimer": "Timer pausieren",
+  "menu.resumeTimer": "Timer fortsetzen",
+  "menu.cancelTimer": "Timer abbrechen",
+  "menu.startPomodoro": "Pomodoro starten",
+  "menu.pausePomodoro": "Pomodoro pausieren",
+  "menu.resetPomodoro": "Pomodoro zurücksetzen",
+  "menu.skipPomodoroPhase": "Phase überspringen"
 }

@@ -210,5 +210,16 @@
   "clock.error.title": "Clock n’a pas pu enregistrer cette modification",
   "clock.error.dismiss": "Fermer",
   "bookmark.view": "Vue de l’horloge",
-  "bookmark.item": "Élément sélectionné"
+  "bookmark.item": "Élément sélectionné",
+  "menu.startStopwatch": "Démarrer le chronomètre",
+  "menu.stopStopwatch": "Arrêter le chronomètre",
+  "menu.lapStopwatch": "Tour",
+  "menu.resetStopwatch": "Réinitialiser le chronomètre",
+  "menu.pauseTimer": "Mettre le minuteur en pause",
+  "menu.resumeTimer": "Reprendre le minuteur",
+  "menu.cancelTimer": "Annuler le minuteur",
+  "menu.startPomodoro": "Démarrer le Pomodoro",
+  "menu.pausePomodoro": "Mettre le Pomodoro en pause",
+  "menu.resetPomodoro": "Réinitialiser le Pomodoro",
+  "menu.skipPomodoroPhase": "Passer la phase"
 }
