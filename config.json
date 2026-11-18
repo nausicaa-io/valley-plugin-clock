@@ -26657,9 +26657,14 @@
     ],
     "activation": {
       "backend": [
-        "background",
         "capability"
-      ]
+      ],
+      "wake": {
+        "notifications": true
+      },
+      "idle": {
+        "stopAfterMs": 600000
+      }
     },
     "largeDataOperations": [
       "workflow.execute"

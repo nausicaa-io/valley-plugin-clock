@@ -1,6 +1,6 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { uiText } from './localization'
-import { whileVisible } from './visibility'
+import { observeShown, whileVisible } from './visibility'
 import type { ClockStore } from './store'
 import { type AlarmSoundId, type SoundPlayback } from './sounds'
 import { CITIES, cityId, cityName, cityMatches, cityTime, isDaytime, dayOffsetLabel, offsetLabel } from './worldClock'
@@ -1243,16 +1243,18 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
   function renderPomodoro(): ReturnType<typeof h> { return h(PomodoroPanel) }
 
   // ---- Panel -------------------------------------------------------------
-  const useStore = (): void => {
+  // The 100 ms clock/timer re-render runs only while the panel is shown: window visible and the panel laid out on screen.
+  const useStore = (panel: React.RefObject<HTMLDivElement | null>): void => {
     const [, force] = React.useState(0)
     React.useEffect(() => {
       const render = (): void => force((n) => n + 1)
+      let shown = true
       const animating = (): boolean => clockNeedsAnimation({
         mode: store.state.mode,
         swRunning: false,
         anyTimerRunning: store.state.timers.some(t => t.running),
         pomoRunning: store.state.pomo.running
-      }, document.hidden)
+      }, !shown)
       let tick = 0
       const sync = (): void => {
         if (animating() && !tick) tick = window.setInterval(render, 100)
@@ -1260,11 +1262,11 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
       }
       const onNotify = (): void => { render(); sync() }
       const off = store.subscribe(onNotify)
-      document.addEventListener('visibilitychange', onNotify)
+      const offShown = observeShown(panel.current, value => { shown = value; onNotify() })
       sync()
       return () => {
         off()
-        document.removeEventListener('visibilitychange', onNotify)
+        offShown()
         if (tick) window.clearInterval(tick)
       }
     }, [])
@@ -1277,11 +1279,12 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
 
   const Panel = (): ReturnType<typeof h> => {
     const s = api.settings.get()
-    useStore()
+    const panel = React.useRef<HTMLDivElement>(null)
+    useStore(panel)
     React.useEffect(() => {
       if (store.state.mode !== 'alarm') return
       void store.refreshSounds()
-      return whileVisible(() => { void store.refreshSounds() }, 3000)
+      return whileVisible(() => { void store.refreshSounds() }, 3000, panel.current)
     }, [store.state.mode])
     const { weekStart, timeFormat } = useHostState()
     const showSeconds = s.seconds !== false
@@ -1375,7 +1378,7 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
 
     return h(
       'div',
-      { className: 'clock-panel' },
+      { className: 'clock-panel', ref: panel },
       // A single remaining tab is no choice at all — drop the strip entirely.
       modes.length > 1 &&
         h(
