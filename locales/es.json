@@ -185,7 +185,7 @@
   "surface.unavailable": "Esta alarma, temporizador o ciudad ya no está disponible. Abre Clock para elegir otro elemento.",
   "surface.worldSettings": "Ajustes del reloj mundial",
   "sounds.folder": "Sonidos de alarma",
-  "sounds.folderDescription": "Añade archivos de audio a .valley/assets/alarm-sounds/. Aparecerán aquí automáticamente.",
+  "sounds.folderDescription": "Añade archivos de audio a .valley/assets/sounds/alarm-sound/. Aparecerán aquí automáticamente.",
   "sounds.openFolder": "Abrir carpeta",
   "sounds.unavailable": "No se pudo abrir la carpeta de sonidos.",
   "timer.unit.h": "Horas",

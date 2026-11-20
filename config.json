@@ -22,7 +22,7 @@
       "descriptionKey": "plugin.clock.notification.alarmDesc",
       "defaultChannel": "both",
       "ringable": true,
-      "soundDirectory": "assets/alarm-sounds"
+      "soundDirectory": "assets/sounds/alarm-sound"
     },
     {
       "id": "timer",
@@ -32,7 +32,7 @@
       "descriptionKey": "plugin.clock.notification.timerDesc",
       "defaultChannel": "both",
       "ringable": true,
-      "soundDirectory": "assets/alarm-sounds"
+      "soundDirectory": "assets/sounds/alarm-sound"
     },
     {
       "id": "pomodoro",
@@ -61,7 +61,7 @@
       "storage": [
         ".valley/plugins/data/clock/config.json",
         ".valley/plugins/data/clock/alarms.jsonl",
-        ".valley/assets/alarm-sounds/"
+        ".valley/assets/sounds/alarm-sound/"
       ]
     },
     {
@@ -26668,7 +26668,7 @@
   "permissions": {
     "storage": {
       "metadata": [
-        "assets/alarm-sounds"
+        "assets/sounds/alarm-sound"
       ]
     },
     "largeData": true

@@ -185,7 +185,7 @@
   "surface.unavailable": "Dieser Wecker, Timer oder Ort ist nicht mehr verfügbar. Öffne Clock und wähle einen anderen Eintrag.",
   "surface.worldSettings": "Weltuhr-Einstellungen",
   "sounds.folder": "Wecktöne",
-  "sounds.folderDescription": "Audiodateien in .valley/assets/alarm-sounds/ ablegen. Sie erscheinen hier automatisch.",
+  "sounds.folderDescription": "Audiodateien in .valley/assets/sounds/alarm-sound/ ablegen. Sie erscheinen hier automatisch.",
   "sounds.openFolder": "Ordner öffnen",
   "sounds.unavailable": "Der Ordner für Wecktöne konnte nicht geöffnet werden.",
   "timer.unit.h": "Stunden",

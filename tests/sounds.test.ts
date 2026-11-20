@@ -75,7 +75,7 @@ describe('alarm sound folder', () => {
     resolve([])
     await vi.waitFor(() => expect(preview.players[0]?.load).toHaveBeenCalledOnce())
     expect(preview.createLocalPlayer).toHaveBeenCalledWith(expect.objectContaining({ preview: true }))
-    expect(preview.players[0].load).toHaveBeenCalledWith(expect.objectContaining({ path: '.valley/assets/alarm-sounds/Forest.mp3' }), { autoplay: false, position: 0 })
+    expect(preview.players[0].load).toHaveBeenCalledWith(expect.objectContaining({ path: '.valley/assets/sounds/alarm-sound/Forest.mp3' }), { autoplay: false, position: 0 })
     expect(preview.players[0].play).not.toHaveBeenCalled()
     playback.resume()
     expect(preview.players[0].play).toHaveBeenCalledOnce()

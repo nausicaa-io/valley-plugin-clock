@@ -185,7 +185,7 @@
   "surface.unavailable": "This alarm, timer or city is no longer available. Open Clock to choose another item.",
   "surface.worldSettings": "World clock settings",
   "sounds.folder": "Alarm sounds",
-  "sounds.folderDescription": "Add audio files to .valley/assets/alarm-sounds/. They appear here automatically.",
+  "sounds.folderDescription": "Add audio files to .valley/assets/sounds/alarm-sound/. They appear here automatically.",
   "sounds.openFolder": "Open folder",
   "sounds.unavailable": "Could not open the alarm sounds folder.",
   "timer.unit.h": "Hours",

@@ -185,7 +185,7 @@
   "surface.unavailable": "此闹钟、计时器或城市已不可用。请打开时钟选择其他项目。",
   "surface.worldSettings": "世界时钟设置",
   "sounds.folder": "闹钟声音",
-  "sounds.folderDescription": "将音频文件添加到 .valley/assets/alarm-sounds/，它们会自动显示在此处。",
+  "sounds.folderDescription": "将音频文件添加到 .valley/assets/sounds/alarm-sound/，它们会自动显示在此处。",
   "sounds.openFolder": "打开文件夹",
   "sounds.unavailable": "无法打开闹钟声音文件夹。",
   "timer.unit.h": "小时",

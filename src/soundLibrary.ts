@@ -1,6 +1,6 @@
 export type BuiltinSoundId = 'beep' | 'chime' | 'pulse' | 'radar' | 'bell'
 export type AlarmSoundId = BuiltinSoundId | `file:${string}`
-export const SOUND_FOLDER = 'assets/alarm-sounds'
+export const SOUND_FOLDER = 'assets/sounds/alarm-sound'
 export interface SoundOption { value: AlarmSoundId; label: string }
 export const isSoundFile = (name: string): boolean => !/[\\/\x00-\x1f]/.test(name) && /\.(wav|mp3|m4a|aac|ogg|opus|flac|webm)$/i.test(name)
 export const isSoundId = (id: unknown): id is AlarmSoundId => typeof id === 'string' && (Object.hasOwn(SOUNDS, id) || (id.startsWith('file:') && isSoundFile(id.slice(5))))
