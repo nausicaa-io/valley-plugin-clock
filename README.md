@@ -20,6 +20,19 @@ Alarm audio lives in `.valley/assets/sounds/alarm-sound/`. Clock seeds five WAV 
 
 The package’s `manifest.name` and `manifest.description` catalog entries translate its identity, including while disabled. Missing translations fall back to this package’s English catalog. A plugin never falls back to Valley’s catalog or another plugin’s catalog.
 
+## Code block
+
+A `clock` fence draws Clock in a note. The first of `world`, `timer` and `countdown` present picks the kind; otherwise the block is the analog face.
+
+| Kind | Keys | Shows |
+| --- | --- | --- |
+| Clock face | `city` (also `zone`, `tz`: a Clock city or an IANA zone; omit for local time), `seconds: false` | The analog face, the city, its time (12/24 h from Valley's General setting) and its offset |
+| World clocks | `world` as a list or `Zurich, Tokyo` | One row per city with its time, day and offset |
+| Timer button | `timer` (`25m`, `1h30m`, `90s`, `0:45`, bare minutes; at most 999 h), optional `label` | A Start timer button that starts a real Clock timer and opens the panel; hidden while Timer is switched off |
+| Countdown | `countdown` (`YYYY-MM-DD`, optional ` HH:mm[:ss]`, local time), optional `label` | Time left, then Reached once the moment has passed |
+
+Live blocks tick once a second only while they are on screen. A block Clock cannot read shows one plain line naming the problem. Settings → Markdown → Code blocks lists these examples.
+
 ## Development and releases
 
 Use Node 24.19.0 and npm 11.17.0. From this repository, run:

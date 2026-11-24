@@ -942,6 +942,54 @@ export const CSS = `
   text-align: center;
   pointer-events: none;
 }
+
+/* ---- clock code block ---------------------------------------------- */
+.clock-fence { margin: 0.75em 0; }
+.clock-fence-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--container-color);
+}
+.clock-fence-face { flex: none; width: 96px; height: 96px; }
+.clock-fence-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.clock-fence-title {
+  font-weight: var(--font-semi-bold);
+  color: var(--title-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clock-fence-world {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: var(--space-1) var(--space-4);
+}
+.clock-fence-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+.clock-fence-row + .clock-fence-row { border-top: 1px solid var(--border-light); }
+.clock-fence-timer .clock-btn { flex: none; }
+.clock-fence-error {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: var(--small-font-size);
+}
 `
 
 /** Inject (or refresh, on hot reload) the plugin stylesheet. */

@@ -8,6 +8,7 @@ import { registerClockSurfaces } from './surfaces'
 import { parseDuration } from './timers'
 import { parseClockTime } from './alarms'
 import { viewEnabled } from './preferences'
+import { registerClockFence } from './fence'
 
 export type { ClockStore } from './store'
 export { VIEW_SETTING, CLOCK_VIEWS, viewEnabled, visibleModes, orderedModes, readStringList, DEFAULT_TIMER_PRESETS, timerPresets, fmtPresetLabel } from './preferences'
@@ -31,11 +32,12 @@ export function register(api: ValleyPluginApi): () => void {
   initLocalization(api)
   const disposeStyles = injectStyles()
   const store = getStore(api)
-  const { Panel, SettingsView } = createClockViews(api, store)
+  const { Panel, SettingsView, renderClockFace } = createClockViews(api, store)
   api.registerView('clock.panel', Panel)
   api.registerView('clock.settings', SettingsView)
   const offs = registerCommands(api, store)
   const offSurfaces = registerClockSurfaces(api, store)
+  const offFence = registerClockFence(api, store, renderClockFace)
   const offLinkHandler = api.links.register({
     id: 'prefill', label: api.ui.t('manifest.name'), version: '1.0.0', categories: ['time', 'duration'],
     open: async ({ category, value }) => {
@@ -67,6 +69,7 @@ export function register(api: ValleyPluginApi): () => void {
     offLinkHandler()
     offs.forEach((off) => off())
     offSurfaces()
+    offFence()
     offSettings()
     // Without this the previous session keeps answering ring ticks after a hot
     // reload, and every alarm sounds once per surviving listener.

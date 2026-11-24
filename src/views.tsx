@@ -247,8 +247,7 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
   // (square) ends, and the accent second hand: a thin stem ending in the
   // iconic disc (the dot is the tip — no stem protruding past it). No rounded
   // caps anywhere.
-  function renderClockFace(showSeconds: boolean): ReturnType<typeof h> {
-    const d = new Date()
+  function renderClockFace(showSeconds: boolean, d = new Date()): ReturnType<typeof h> {
     const within = d.getSeconds() * 1000 + d.getMilliseconds()
     const secondAngle = within / 60000 * 360
     const minuteAngle = (d.getMinutes() + within / 60000) * 6
@@ -1391,5 +1390,5 @@ export function createClockViews(api: ValleyPluginApi, store: ClockStore) {
   }
 
   const SettingsView = createClockSettings(api, store, { worldAddSelect, worldList, pomodoroIcon: tabIcon.pomodoro })
-  return { Panel, SettingsView }
+  return { Panel, SettingsView, renderClockFace }
 }

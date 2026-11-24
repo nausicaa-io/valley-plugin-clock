@@ -1,0 +1,40 @@
+{
+  "clock": [
+    {
+      "id": "time",
+      "label": "Local time",
+      "labelKey": "markdown.examples.time",
+      "code": ""
+    },
+    {
+      "id": "city",
+      "label": "City time",
+      "labelKey": "markdown.examples.city",
+      "code": "city: Tokyo"
+    },
+    {
+      "id": "noSeconds",
+      "label": "Without second hand",
+      "labelKey": "markdown.examples.noSeconds",
+      "code": "city: New York\nseconds: false"
+    },
+    {
+      "id": "world",
+      "label": "World clocks",
+      "labelKey": "markdown.examples.world",
+      "code": "world:\n  - Zurich\n  - New York\n  - Tokyo\n  - Sydney"
+    },
+    {
+      "id": "timer",
+      "label": "Timer button",
+      "labelKey": "markdown.examples.timer",
+      "code": "timer: 25m\nlabel: Focus"
+    },
+    {
+      "id": "countdown",
+      "label": "Countdown",
+      "labelKey": "markdown.examples.countdown",
+      "code": "countdown: 2026-12-24 18:00\nlabel: Christmas Eve"
+    }
+  ]
+}
